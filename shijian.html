@@ -6,27 +6,30 @@
     <title>拾间</title>
     <style>
         body { background-color: #F7F5F0; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
-        .header { text-align: center; padding: 20px 20px 10px 20px; color: #5D5C58; }
+        
+        /* 头部模块 */
+        .header { position: relative; text-align: center; padding: 20px 20px 10px 20px; color: #5D5C58; }
         .header h1 { font-size: 22px; font-weight: normal; letter-spacing: 4px; margin: 0 0 8px 0; }
         .header p { font-size: 12px; color: #A5A49E; margin: 0; letter-spacing: 1px; }
         
+        /* 聊天区域模块 */
         .chat-container { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
         .message { max-width: 85%; padding: 12px 16px; border-radius: 12px; font-size: 15px; line-height: 1.6; width: fit-content; word-break: break-all; }
         
+        /* 气泡样式模块 */
         .user-message { background-color: #E2DCD3; color: #333; align-self: flex-end; border-top-right-radius: 2px; }
         .ai-message { background-color: #FFFFFF; color: #4A4A4A; align-self: flex-start; border-top-left-radius: 2px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); white-space: pre-wrap; }
-        
         .image-message { padding: 5px; background-color: #E2DCD3; align-self: flex-end; border-radius: 12px; }
         .image-message img { max-width: 200px; border-radius: 8px; display: block; }
 
+        /* 底部输入区模块 */
         .input-area { padding: 10px 15px; background-color: #FFFFFF; display: flex; align-items: center; gap: 10px; border-top: 1px solid #EFEFEF; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
-        
         .action-btn { background-color: #D4D1C9; color: white; border: none; width: 36px; height: 36px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
         .action-btn:hover { background-color: #B0AEA8; }
         .input-box { flex: 1; background-color: #F7F5F0; border: none; padding: 10px 14px; border-radius: 20px; font-size: 15px; color: #333; outline: none; }
         .input-box::placeholder { color: #B5B3AC; }
 
-        /* 专门针对手机屏幕的优化 */
+        /* 手机端适配 */
         @media (max-width: 600px) {
             .header { padding: 15px 15px 10px 15px; }
             .header h1 { font-size: 20px; }
@@ -38,11 +41,17 @@
 </head>
 <body>
 
+    <!-- 头部 -->
     <div class="header">
         <h1>拾 间</h1>
         <p>拾取时光的碎片，留足生活的空白</p>
+        <!-- 导出叶子按钮 -->
+        <div style="position: absolute; right: 20px; top: 20px; cursor: pointer; opacity: 0.4; font-size: 18px;" onclick="exportData()" title="导出我的时光切片">
+            🍃
+        </div>
     </div>
 
+    <!-- 聊天框 -->
     <div class="chat-container" id="chatContainer">
         <div class="message ai-message">
             我在。
@@ -51,6 +60,7 @@
         </div>
     </div>
 
+    <!-- 输入区 -->
     <div class="input-area">
         <input type="file" id="imageInput" accept="image/*" style="display: none;">
         <button class="action-btn" onclick="document.getElementById('imageInput').click()">📷</button>
@@ -58,14 +68,14 @@
         <button class="action-btn" id="sendBtn" onclick="sendMessage()">↑</button>
     </div>
 
-        <script>
+    <!-- 逻辑模块 -->
+    <script>
         const chatContainer = document.getElementById('chatContainer');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
         const imageInput = document.getElementById('imageInput');
 
         // ================= 模块一：记忆读取 =================
-        // 页面加载时，自动从本地读取历史记录并渲染出来
         window.onload = function() {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
             
@@ -74,15 +84,15 @@
                 chatContainer.innerHTML = ''; // 清空
                 history.forEach(msg => {
                     if (msg.type === 'text') {
-                        appendMessage(msg.content, msg.role === 'user' ? 'user-message' : 'ai-message', '', false);
+                        appendMessage(msg.content, msg.role === 'user' ? 'user-message' : 'ai-message');
                     } else if (msg.type === 'image') {
-                        appendImage(msg.content, false);
+                        appendImage(msg.content);
                     }
                 });
             }
         };
 
-        // 保存消息到本地存储的函数
+        // 保存消息到本地存储
         function saveToHistory(type, role, content) {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
             history.push({ type, role, content });
@@ -132,7 +142,7 @@
         // ================= 模块四：呼叫AI大脑 =================
         async function callAI(contentArray) {
             const loadingId = 'loading-' + Date.now();
-            appendMessage("拾间正在感受...", 'ai-message', loadingId, false); // 思考中不存入本地
+            appendMessage("拾间正在感受...", 'ai-message', loadingId);
             sendBtn.disabled = true;
 
             try {
@@ -165,9 +175,8 @@
             }
         }
 
-        // ================= 模块五：渲染辅助函数 =================
-        // 新增了 isSave 参数，用于控制是否需要再次写入本地
-        function appendMessage(text, className, id = '', isSave = true) {
+        // ================= 模块五：渲染气泡 =================
+        function appendMessage(text, className, id = '') {
             const msgDiv = document.createElement('div');
             msgDiv.className = `message ${className}`;
             if (id) msgDiv.id = id;
@@ -176,7 +185,7 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        function appendImage(base64Image, isSave = true) {
+        function appendImage(base64Image) {
             const imgDiv = document.createElement('div');
             imgDiv.className = 'message image-message';
             const img = document.createElement('img');
@@ -186,6 +195,40 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
+        // ================= 模块六：导出数据 =================
+        function exportData() {
+            const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            
+            if (history.length === 0) {
+                alert("现在还是纯白的留白，没有任何记录可以导出哦。");
+                return;
+            }
+
+            let textContent = "【拾间 · 我的时光切片】\n\n";
+            history.forEach(item => {
+                if (item.type === 'text') {
+                    if (item.role === 'user') {
+                        textContent += `[我]：${item.content}\n`;
+                    } else {
+                        textContent += `[拾间]：${item.content}\n\n`;
+                    }
+                } else if (item.type === 'image') {
+                    textContent += `[我]：（上传了一张图片/截图）\n\n`;
+                }
+            });
+
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `拾间_时光切片_${new Date().toLocaleDateString()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // 回车发送
         messageInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 sendMessage();
