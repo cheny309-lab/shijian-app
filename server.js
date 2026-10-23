@@ -6,30 +6,33 @@ const app = express();
 // 允许接收大图片
 app.use(express.json({ limit: '50mb' }));
 
-// 自动把当前文件夹里的 shijian.html 作为首页展示
-app.use(express.static(__dirname));
+// 自动将当前文件夹里的 shijian.html 作为首页展示
+const path = require('path');
+app.get('/', (req, res) => {
+    res.sendFile(path.join(process.cwd(), 'shijian.html'));
+});
 
 // ⚠️ 这里的 Key 不再写死，而是从云端的安全环境变量中读取
 const API_KEY = process.env.ZHIPU_API_KEY;
 
 // 处理 AI 对话请求
-app.post('/api/chat', async (req, res) => {
-  try {
-    // 把前端传来的数据，加上系统人设，转发给智谱
+应用.帖子('/api/chat', 异步 (req, res) => {
+  尝试 {
+    // 将前端传来的数据，加上系统人设，转发给智谱
     const requestData = {
-      model: "glm-4v", // 支持看图的模型
-      messages: [
+      模型: "glm-4v", // 支持看图的模型
+      消息: [
         {
-          role: "system",
-          content: "你是『拾间』App的底层AI。你的理念是：人生本无意义，不存在无意义支出；没有被记录的时间就是留白；不评判、不打扰、只陪伴。用户发来了一段生活记录或消费截图，请你用克制、温暖、不带任何数字评判的语气，写一段不超过100字的《今日时光切片》。要求：指出这笔消费背后的情绪，或者赞美他/她今天的辛苦，不出现任何‘超支、浪费、应该’等词汇。像老朋友一样回复，不要有长篇大论的废话。"
+          角色: "系统",
+          内容: "你是『拾间』App的底层AI。你的理念是：人生本无意义，不存在无意义支出；没有被记录的时间就是留白；不评判、不打扰、只陪伴。用户发来了一段生活记录或消费截图，请你用克制、温暖、不带任何数字评判的语气，写一段不超过100字的《今日时光切片》。要求：指出这笔消费背后的情绪，或者赞美他/她今天的辛苦，不出现任何‘超支、浪费、应该’等词汇。像老朋友一样回复，不要有长篇大论的废话。"
         },
         req.body.messages[0] // 接收前端传来的用户消息（文字或图片）
       ]
     };
 
     const response = await axios.post('https://open.bigmodel.cn/api/paas/v4/chat/completions', requestData, {
-      headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+      头部: {
+        '授权': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json'
       }
     });
