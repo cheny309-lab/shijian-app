@@ -8,29 +8,27 @@
         .header { text-align: center; padding: 30px 20px 10px 20px; color: #5D5C58; }
         .header h1 { font-size: 22px; font-weight: normal; letter-spacing: 4px; margin: 0 0 8px 0; }
         .header p { font-size: 12px; color: #A5A49E; margin: 0; letter-spacing: 1px; }
+        .chat-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
+        .message { max-width: 75%; padding: 12px 16px; border-radius: 12px; font-size: 15px; line-height: 1.6; width: fit-content; word-break: break-all; }
         
-        .chat-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }chat-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; }
-        .message { 最大宽度: 75%; 内边距: 12px 16px; 圆角: 12px; 字体大小: 15px; 行高: 1.6; 宽度: 适应内容; 断词: 强制断词; }message { max-width: 75%; padding: 12px 16px; border-radius: 12px; font-size: 15px; line-height: 1.6; width: fit-content; word-break: break-all; }
+        .user-message { background-color: #E2DCD3; color: #333; align-self: flex-end; border-top-right-radius: 2px; }
+        .ai-message { background-color: #FFFFFF; color: #4A4A4A; align-self: flex-start; border-top-left-radius: 2px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); white-space: pre-wrap; }
         
-        .user-message { background-color: #E2DCD3; color: #333; align-self: flex-end; border-top-right-radius: 2px; }user-message { background-color: #E2DCD3; color: #333; align-self: flex-end; border-top-right-radius: 2px; }
-        .ai-message { background-color: #FFFFFF; color: #4A4A4A; align-self: flex-start; border-top-left-radius: 2px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); white-space: pre-wrap; }ai-message { background-color: #FFFFFF; color: #4A4A4A; align-self: flex-start; border-top-left-radius: 2px; box-shadow: 0 2px 10px rgba(0,0,0,0.03); white-space: pre-wrap; }
-        
-        /* 图片气泡的样式 *//* 图片气泡的样式 */
-        .image-message { padding: 5px; background-color: #E2DCD3; align-self: flex-end; border-top-right-radius: 12px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; border-top-left-radius: 12px; }image-message { padding: 5px; background-color: #E2DCD3; align-self: flex-end; border-top-right-radius: 12px; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; border-top-left-radius: 12px; }
-        .image-message img { max-width: 200px; border-radius: 8px; display: block; }image-message img { max-width: 200px; border-radius: 8px; display: block; }
+        .image-message { padding: 5px; background-color: #E2DCD3; align-self: flex-end; border-radius: 12px; }
+        .image-message img { max-width: 200px; border-radius: 8px; display: block; }
 
-        .input-area { padding: 15px 20px; background-color: #FFFFFF; display: flex; align-items: center; gap: 12px; border-top: 1px solid #EFEFEF; }input-area { padding: 15px 20px; background-color: #FFFFFF; display: flex; align-items: center; gap: 12px; border-top: 1px solid #EFEFEF; }
-        .action-btn { background-color: #D4D1C9; color: white; border: none; width: 38px; height: 38px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }action-btn { background-color: #D4D1C9; color: white; border: none; width: 38px; height: 38px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
-        .action-btn:hover { background-color: #B0AEA8; }action-btn:hover { background-color: #B0AEA8; }
-        .input-box { flex: 1; background-color: #F7F5F0; border: none; padding: 12px 18px; border-radius: 20px; font-size: 15px; color: #333; outline: none; }input-box { flex: 1; background-color: #F7F5F0; border: none; padding: 12px 18px; border-radius: 20px; font-size: 15px; color: #333; outline: none; }
-        .input-box::placeholder { color: #B5B3AC; }input-box::placeholder { color: #B5B3AC; }
-    </style    
+        .input-area { padding: 15px 20px; background-color: #FFFFFF; display: flex; align-items: center; gap: 12px; border-top: 1px solid #EFEFEF; }
+        .action-btn { background-color: #D4D1C9; color: white; border: none; width: 38px; height: 38px; border-radius: 50%; font-size: 18px; cursor: pointer; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
+        .action-btn:hover { background-color: #B0AEA8; }
+        .input-box { flex: 1; background-color: #F7F5F0; border: none; padding: 12px 18px; border-radius: 20px; font-size: 15px; color: #333; outline: none; }
+        .input-box::placeholder { color: #B5B3AC; }
+    </style>
 </head>
-body>
+<body>
 
-<body>    div class="header">
-        拾间<h1>拾 间</h1>
-        拾取时光的碎片，留足生活的空白<p>拾取时光的碎片，留足生活的空白</p>
+    <div class="header">
+        <h1>拾 间</h1>
+        <p>拾取时光的碎片，留足生活的空白</p>
     </div>
 
     <div class="chat-container" id="chatContainer">
@@ -42,11 +40,8 @@ body>
     </div>
 
     <div class="input-area">
-        <!-- 隐藏的系统文件选择器 -->
         <input type="file" id="imageInput" accept="image/*" style="display: none;">
-        <!-- 相机按钮：点击时触发隐藏的文件选择器 -->
         <button class="action-btn" onclick="document.getElementById('imageInput').click()">📷</button>
-        
         <input type="text" class="input-box" id="messageInput" placeholder="说点什么，或者发张截图...">
         <button class="action-btn" id="sendBtn" onclick="sendMessage()">↑</button>
     </div>
@@ -57,8 +52,6 @@ body>
         const sendBtn = document.getElementById('sendBtn');
         const imageInput = document.getElementById('imageInput');
 
-      
-        // 1. 发送文字消息的逻辑
         async function sendMessage() {
             const text = messageInput.value.trim(); 
             if (!text) return; 
@@ -66,12 +59,10 @@ body>
             appendMessage(text, 'user-message');
             messageInput.value = '';
 
-            // 将文字包装成多模态格式
             const contentArray = [{ type: "text", text: text }];
             callAI(contentArray);
         }
 
-        // 2. 监听图片上传
         imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -79,11 +70,8 @@ body>
             const reader = new FileReader();
             reader.onload = function(event) {
                 const base64Image = event.target.result;
-                
-                // 先把图片显示在屏幕上
                 appendImage(base64Image);
                 
-                // 构造发给大模型的内容 (文字指令 + 图片数据)
                 const contentArray = [
                     { 
                         type: "text", 
@@ -94,34 +82,27 @@ body>
                         image_url: { url: base64Image } 
                     }
                 ];
-                
                 callAI(contentArray);
             };
             reader.readAsDataURL(file);
-            // 清空 input，确保下次选同一张图也能触发 change 事件
             imageInput.value = ''; 
         });
 
-        // 3. 统一呼叫大脑（支持文字和图片）
         async function callAI(contentArray) {
             const loadingId = 'loading-' + Date.now();
             appendMessage("拾间正在感受...", 'ai-message', loadingId);
             sendBtn.disabled = true;
 
             try {
-                const response = await fetch("/api/chat", {// 注意这里走的是本地中转站
+                // 这里的请求路径是相对路径，服务器会自动识别
+                const response = await fetch("/api/chat", {
                     method: "POST",
                     headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${API_KEY}`
+                        "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        model: "glm-4v", // 注意：换成了带有视觉能力的 glm-4v 模型
+                        model: "glm-4v",
                         messages: [
-                            {
-                                role: "system",
-                                content: "你是『拾间』App的底层AI。你的理念是：人生本无意义，不存在无意义支出；没有被记录的时间就是留白；不评判、不打扰、只陪伴。用户发来了一段生活记录或消费截图，请你用克制、温暖、不带任何数字评判的语气，写一段不超过100字的《今日时光切片》。要求：指出这笔消费背后的情绪，或者赞美他/她今天的辛苦，不出现任何‘超支、浪费、应该’等词汇。像老朋友一样回复，不要有长篇大论的废话。"
-                            },
                             { 
                                 role: "user", 
                                 content: contentArray 
@@ -142,14 +123,13 @@ body>
 
             } catch (error) {
                 document.getElementById(loadingId).remove();
-                appendMessage("连接大脑失败了，请检查中转站是否开启。", 'ai-message');
+                appendMessage("连接大脑失败了，稍后再试。", 'ai-message');
                 console.error(error);
             } finally {
                 sendBtn.disabled = false;
             }
         }
 
-        // 4. 辅助函数：生成文字气泡
         function appendMessage(text, className, id = '') {
             const msgDiv = document.createElement('div');
             msgDiv.className = `message ${className}`;
@@ -159,7 +139,6 @@ body>
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        // 5. 辅助函数：生成图片气泡
         function appendImage(base64Image) {
             const imgDiv = document.createElement('div');
             imgDiv.className = 'message image-message';
