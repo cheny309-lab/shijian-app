@@ -58,23 +58,51 @@
         <button class="action-btn" id="sendBtn" onclick="sendMessage()">↑</button>
     </div>
 
-    <script>
+        <script>
         const chatContainer = document.getElementById('chatContainer');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
         const imageInput = document.getElementById('imageInput');
 
+        // ================= 模块一：记忆读取 =================
+        // 页面加载时，自动从本地读取历史记录并渲染出来
+        window.onload = function() {
+            const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            
+            // 如果之前有记录，清空默认的开场白，渲染历史；如果没有，保留默认开场白
+            if (history.length > 0) {
+                chatContainer.innerHTML = ''; // 清空
+                history.forEach(msg => {
+                    if (msg.type === 'text') {
+                        appendMessage(msg.content, msg.role === 'user' ? 'user-message' : 'ai-message', '', false);
+                    } else if (msg.type === 'image') {
+                        appendImage(msg.content, false);
+                    }
+                });
+            }
+        };
+
+        // 保存消息到本地存储的函数
+        function saveToHistory(type, role, content) {
+            const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            history.push({ type, role, content });
+            localStorage.setItem('shijian_history', JSON.stringify(history));
+        }
+
+        // ================= 模块二：发送文字 =================
         async function sendMessage() {
             const text = messageInput.value.trim(); 
             if (!text) return; 
 
             appendMessage(text, 'user-message');
+            saveToHistory('text', 'user', text); // 存入本地
             messageInput.value = '';
 
             const contentArray = [{ type: "text", text: text }];
             callAI(contentArray);
         }
 
+        // ================= 模块三：发送图片 =================
         imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -83,6 +111,7 @@
             reader.onload = function(event) {
                 const base64Image = event.target.result;
                 appendImage(base64Image);
+                saveToHistory('image', 'user', base64Image); // 存入本地
                 
                 const contentArray = [
                     { 
@@ -100,25 +129,19 @@
             imageInput.value = ''; 
         });
 
+        // ================= 模块四：呼叫AI大脑 =================
         async function callAI(contentArray) {
             const loadingId = 'loading-' + Date.now();
-            appendMessage("拾间正在感受...", 'ai-message', loadingId);
+            appendMessage("拾间正在感受...", 'ai-message', loadingId, false); // 思考中不存入本地
             sendBtn.disabled = true;
 
             try {
                 const response = await fetch("/api/chat", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         model: "glm-4v",
-                        messages: [
-                            { 
-                                role: "user", 
-                                content: contentArray 
-                            }
-                        ]
+                        messages: [{ role: "user", content: contentArray }]
                     })
                 });
 
@@ -126,10 +149,11 @@
                 document.getElementById(loadingId).remove();
                 
                 if (data.choices && data.choices.length > 0) {
-                    appendMessage(data.choices[0].message.content, 'ai-message');
+                    const aiReply = data.choices[0].message.content;
+                    appendMessage(aiReply, 'ai-message');
+                    saveToHistory('text', 'ai', aiReply); // 把AI的回复存入本地
                 } else {
                     appendMessage("拾间好像走神了，稍微再试一下好吗？", 'ai-message');
-                    console.error("API返回异常:", data);
                 }
 
             } catch (error) {
@@ -141,7 +165,9 @@
             }
         }
 
-        function appendMessage(text, className, id = '') {
+        // ================= 模块五：渲染辅助函数 =================
+        // 新增了 isSave 参数，用于控制是否需要再次写入本地
+        function appendMessage(text, className, id = '', isSave = true) {
             const msgDiv = document.createElement('div');
             msgDiv.className = `message ${className}`;
             if (id) msgDiv.id = id;
@@ -150,7 +176,7 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        function appendImage(base64Image) {
+        function appendImage(base64Image, isSave = true) {
             const imgDiv = document.createElement('div');
             imgDiv.className = 'message image-message';
             const img = document.createElement('img');
