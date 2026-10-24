@@ -48,7 +48,7 @@ app.post('/api/chat', async (req, res) => {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json'
       },
-      timeout: 30000 // 30秒超时限制
+      timeout: 60000 // 60秒超时限制
     });
     
     // 成功返回
