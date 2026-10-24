@@ -143,7 +143,7 @@
         <div id="modalContent"></div>
     </div>
 
-    <script>
+       <script>
         // ========================================================
         // 模块 1：全局变量与基础工具
         // ========================================================
@@ -233,7 +233,7 @@
         window.onload = function() { renderTimeline(); };
 
         // ========================================================
-        // 模块 3：底部输入面板与图片选择
+        // 模块 3：底部输入面板与图片压缩处理
         // ========================================================
         function openInputPanel() {
             inputOverlay.classList.add('show');
@@ -248,41 +248,69 @@
             currentBase64Image = null;
         }
 
+        // 选择图片并自动压缩，防止上传超时
         imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
+            
             const reader = new FileReader();
             reader.onload = function(event) {
-                currentBase64Image = event.target.result;
-                showToast("图片已附加");
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxSize = 800; // 限制最大宽度/高度
+                    
+                    if (width > height && width > maxSize) {
+                        height *= maxSize / width;
+                        width = maxSize;
+                    } else if (height > maxSize) {
+                        width *= maxSize / height;
+                        height = maxSize;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                    
+                    currentBase64Image = canvas.toDataURL('image/jpeg', 0.8); // 压缩质量80%
+                    showToast("图片已附加");
+                };
+                img.src = event.target.result;
             };
             reader.readAsDataURL(file);
             imageInput.value = ''; 
         });
 
         // ========================================================
-        // 模块 4：保存记录与呼叫 AI
+        // 模块 4：保存记录与发送请求
         // ========================================================
         async function saveRecord() {
             const text = messageInput.value.trim();
             
-            // 防呆提示：解决“点保存没反应”
             if (!text && !currentBase64Image) {
                 showToast("写点什么，或者加张图片吧～");
                 return;
             }
 
             closeInputPanel();
-            
             if (text) saveToHistory('text', 'user', text);
             if (currentBase64Image) saveToHistory('image', 'user', currentBase64Image);
             
             showToast("拾间正在感受...");
 
+            // 严格按照智谱 API 格式组装消息
             let contentArray = [];
             if (text) contentArray.push({ type: "text", text: text });
-            if (currentBase64Image) contentArray.push({ type: "image_url", image_url: { url: currentBase64Image } });
+            if (currentBase64Image) {
+                contentArray.push({ 
+                    type: "image_url", 
+                    image_url: { url: currentBase64Image } 
+                });
+            }
             
+            // 如果只有图没有字，给 AI 一个默认的看图指令
             if (currentBase64Image && !text) {
                 contentArray.unshift({ type: "text", text: "请看看这张图片，提取场景或感受意境，写一段时光切片。" });
             }
@@ -296,13 +324,16 @@
                 const response = await fetch("/api/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ model: "glm-4v", messages: [{ role: "user", content: contentArray }] })
+                    body: JSON.stringify({ 
+                        messages: [{ role: "user", content: contentArray }] 
+                    })
                 });
                 
-                if (!response.ok) throw new Error("网络请求失败");
                 const data = await response.json();
                 if (data.choices && data.choices.length > 0) {
                     saveToHistory('text', 'ai', data.choices[0].message.content); 
+                } else {
+                    throw new Error("AI 返回为空");
                 }
             } catch (error) {
                 console.error(error);
@@ -311,7 +342,7 @@
         }
 
         // ========================================================
-        // 模块 5：数据存储与导出
+        // 模块 5：数据本地存储与导出
         // ========================================================
         function saveToHistory(type, role, content) {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
@@ -345,12 +376,11 @@
         }
 
         // ========================================================
-        // 模块 6：单日卡片详情弹窗（方案 A）
+        // 模块 6：单日卡片详情弹窗
         // ========================================================
         function openModal(dateStr, dayData) {
             const modal = document.getElementById('detailModal');
             const content = document.getElementById('modalContent');
-            
             const dateObj = new Date(dateStr);
             const dateTitle = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
 
