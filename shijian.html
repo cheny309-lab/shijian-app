@@ -255,8 +255,8 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            // 图片大小保护（限制3MB以内，防止超时）
-            if (file.size > 3 * 1024 * 1024) {
+            // 图片大小保护（限制5MB以内，防止超时）
+            if (file.size > 5 * 1024 * 1024) {
                 alert("这张图片有点大哦，请截图裁剪小一点再发，或者换一张～");
                 imageInput.value = '';
                 return;
@@ -269,8 +269,8 @@
                 saveToHistory('image', 'user', base64Image);
                 showToast("拾间正在凝视照片..."); // 提示用户正在处理
 
-                const contentArray = [
-                    { type: "text", text: "请看我发给你的这张消费截图或照片。请提取其中的场景，并写一段不超过100字的《今日时光切片》。" },
+                               const contentArray = [
+                    { type: "text", text: "请看看这张图片。如果是一张账单截图，请提取消费场景；如果是一张风景或生活照片，请感受它的意境。然后写一段不超过100字的《今日时光切片》，就像老朋友一样。" },
                     { type: "image_url", image_url: { url: base64Image } }
                 ];
                 
