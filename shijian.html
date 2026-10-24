@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#F7F6F2">
     <title>拾间</title>
     <style>
         /* ================= 全局与主题色 ================= */
@@ -30,7 +33,7 @@
         .header-right { color: var(--sage-green); font-size: 20px; cursor: pointer; opacity: 0.8; padding: 5px; }
 
         /* ================= 时间流主界面 ================= */
-        .timeline-container { flex: 1; overflow-y: auto; padding: 10px 24px 100px 24px; }
+         .timeline-container { flex: 1; overflow-y: auto; padding: 10px 24px 100px 24px; -webkit-overflow-scrolling: touch; }
         
         .day-group { display: flex; margin-bottom: 36px; position: relative; cursor: pointer; }
         
