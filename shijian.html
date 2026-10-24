@@ -288,48 +288,54 @@
                 return;
             }
 
-            // 调试弹窗：证明点击事件已被触发
-            alert("① 点击生效！正在准备发送数据...");
-
-            closeInputPanel();
-            if (text) saveToHistory('text', 'user', text);
-            if (currentBase64Image) saveToHistory('image', 'user', currentBase64Image);
+            // 1. 先获取数据并关闭面板，避免重复点击
+            const currentText = text;
+            const currentImg = currentBase64Image;
+            closeInputPanel(); 
             
+            if (currentText) saveToHistory('text', 'user', currentText);
+            if (currentImg) saveToHistory('image', 'user', currentImg);
+            
+            showToast("拾间正在感受...");
+
+            // 2. 组装数据
             let contentArray = [];
-            if (text) contentArray.push({ type: "text", text: text });
-            if (currentBase64Image) {
-                contentArray.push({ type: "image_url", image_url: { url: currentBase64Image } });
+            if (currentText) contentArray.push({ type: "text", text: currentText });
+            if (currentImg) {
+                contentArray.push({ type: "image_url", image_url: { url: currentImg } });
             }
-            if (currentBase64Image && !text) {
+            if (currentImg && !currentText) {
                 contentArray.unshift({ type: "text", text: "请看看这张图片，提取场景或感受意境，写一段时光切片。" });
             }
 
-            showToast("拾间正在感受...");
-
+            // 3. 呼叫 AI（加入超时机制）
             try {
-                console.log("准备发送fetch请求...");
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+
                 const response = await fetch("/api/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ messages: [{ role: "user", content: contentArray }] })
+                    body: JSON.stringify({ messages: [{ role: "user", content: contentArray }] }),
+                    signal: controller.signal
                 });
                 
-                console.log("收到后端HTTP状态码:", response.status);
-                if (!response.ok) throw new Error("请求非200状态");
+                clearTimeout(timeoutId); // 成功收到回复，清除定时器
+                
+                if (!response.ok) throw new Error("网络请求失败");
                 
                 const data = await response.json();
                 if (data.choices && data.choices.length > 0) {
                     saveToHistory('text', 'ai', data.choices[0].message.content); 
-                    renderTimeline(); // 只有成功了才刷新视图
+                    renderTimeline(); // 成功后再刷新界面
                 } else {
-                    throw new Error("数据为空");
+                    throw new Error("返回数据格式错误");
                 }
             } catch (error) {
-                console.error("捕获到错误:", error);
-                showToast("⚠️ 反应超时了，请重试"); 
+                console.error("请求出错:", error);
+                showToast("⚠️ 拾间走神了，请稍后再试");
             }
         }
-
         // ========================================================
         // 模块 5：数据本地存储与导出
         // ========================================================
