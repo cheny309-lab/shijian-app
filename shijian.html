@@ -12,79 +12,228 @@
     <meta name="theme-color" content="#F7F6F2">
     
     <title>拾间</title>
-    <style>
-        /* ================= 全局与主题色 ================= */
-        :root {
-            --bg-color: #F7F6F2;
-            --text-main: #2C2C2C;
-            --text-sub: #999999;
-            --sage-green: #8DA38E;
-            --line-color: #E8E6E1;
+       <script>
+        const timelineContainer = document.getElementById('timelineContainer');
+        const messageInput = document.getElementById('messageInput');
+        const imageInput = document.getElementById('imageInput');
+        const inputOverlay = document.getElementById('inputOverlay');
+        const inputPanel = document.getElementById('inputPanel');
+        let currentBase64Image = null; // 暂存当前选中的图片
+
+        // 轻提示
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.innerText = msg;
+            toast.style.cssText = "position:fixed; top:20%; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); color:white; padding:10px 20px; border-radius:20px; font-size:14px; z-index:9999; transition:opacity 0.3s;";
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2000);
         }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background-color: var(--bg-color); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; color: var(--text-main); overflow: hidden; }
-        
-        /* ================= 顶部区域 ================= */
-        .header { padding: 24px 24px 10px 24px; display: flex; justify-content: space-between; align-items: flex-start; }
-        .header-left h1 { font-family: "KaiTi", "STKaiti", serif; font-size: 26px; font-weight: 600; margin: 0 0 6px 0; letter-spacing: 2px; }
-        .header-left p { font-size: 12px; color: var(--text-sub); margin: 0; font-weight: 300; }
-        .header-right { font-size: 20px; cursor: pointer; opacity: 0.8; padding: 5px; }
 
-        /* ================= 主视图：时间流 ================= */
-        .timeline-container { flex: 1; overflow-y: auto; padding: 10px 24px 120px 24px; -webkit-overflow-scrolling: touch; }
-        .day-group { display: flex; margin-bottom: 36px; cursor: pointer; }
-        .date-side { width: 45px; flex-shrink: 0; padding-top: 2px; }
-        .date-num { font-size: 20px; line-height: 1; }
-        .date-month { font-size: 10px; color: var(--text-sub); margin-top: 4px; }
-        .timeline-track { width: 20px; flex-shrink: 0; position: relative; display: flex; justify-content: center; }
-        .timeline-track::before { content: ''; position: absolute; top: 10px; bottom: -45px; width: 1px; background-color: var(--line-color); z-index: 1; }
-        .day-group:last-child .timeline-track::before { display: none; }
-        .dot { width: 5px; height: 5px; background-color: var(--sage-green); border-radius: 50%; margin-top: 8px; z-index: 2; position: relative; }
-        .content-side { flex: 1; padding-left: 8px; }
-        .content-title { font-family: "KaiTi", "STKaiti", serif; font-size: 18px; margin: 0 0 8px 0; }
-        .content-text { font-size: 14px; color: #555; line-height: 1.6; margin: 0 0 12px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .content-image { width: 100%; max-width: 200px; border-radius: 6px; margin-bottom: 12px; display: block; object-fit: cover; }
+        // 渲染时间流
+        function renderTimeline() {
+            const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            const groupedByDay = {};
+            
+            history.forEach(item => {
+                if (!item.time) return;
+                const dateObj = new Date(item.time);
+                const dateStr = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+                if (!groupedByDay[dateStr]) groupedByDay[dateStr] = [];
+                groupedByDay[dateStr].push(item);
+            });
 
-        /* ================= 底部导航与记录按钮 ================= */
-        .bottom-container { position: fixed; bottom: 0; left: 0; right: 0; padding-bottom: env(safe-area-inset-bottom); background-color: var(--bg-color); z-index: 100; }
-        
-        /* 悬浮记录按钮 */
-        .record-btn-wrapper { display: flex; justify-content: center; margin-bottom: 15px; }
-        .record-btn { background-color: var(--sage-green); color: white; border: none; padding: 12px 28px; border-radius: 30px; font-size: 15px; font-weight: 500; letter-spacing: 1px; box-shadow: 0 4px 12px rgba(141, 163, 142, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: transform 0.2s; }
-        .record-btn:active { transform: scale(0.95); }
+            timelineContainer.innerHTML = '';
+            const sortedDates = Object.keys(groupedByDay).sort((a, b) => new Date(b) - new Date(a));
+            
+            if (sortedDates.length === 0) {
+                timelineContainer.innerHTML = '<div style="text-align:center; color:var(--text-sub); margin-top:80px; font-size:14px; letter-spacing:1px;">这里，留给你的日常。</div>';
+                return;
+            }
 
-        .bottom-nav { display: flex; justify-content: space-around; align-items: center; padding: 10px 0 15px 0; border-top: 1px solid #EBEAE6; background-color: var(--bg-color); }
-        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-sub); cursor: pointer; }
-        .nav-item.active { color: var(--text-main); }
-        .icon-home { width: 18px; height: 18px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; margin-bottom: 4px; }
-        .icon-home::before { content: ''; position: absolute; top: -4px; left: 2px; width: 10px; height: 10px; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; transform: rotate(45deg); background-color: var(--bg-color); }
-        .icon-list { width: 16px; height: 18px; border: 1.5px solid currentColor; border-radius: 2px; position: relative; margin-bottom: 4px; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; }
-        .icon-list::before, .icon-list::after { content: ''; width: 8px; height: 1px; background-color: currentColor; }
-        .icon-user { width: 16px; height: 16px; border: 1.5px solid currentColor; border-radius: 50%; position: relative; margin-bottom: 4px; }
-        .icon-user::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 20px; height: 10px; border-top: 1.5px solid currentColor; border-radius: 10px 10px 0 0; }
+            sortedDates.forEach(dateStr => {
+                const dayData = groupedByDay[dateStr];
+                const dateObj = new Date(dateStr);
+                const day = String(dateObj.getDate()).padStart(2, '0');
+                const month = `${dateObj.getMonth() + 1}月`;
+                
+                const aiReply = dayData.find(d => d.role === 'ai' && d.type === 'text');
+                const userImage = dayData.find(d => d.role === 'user' && d.type === 'image');
+                const userText = dayData.find(d => d.role === 'user' && d.type === 'text');
 
-        /* ================= 底部弹出输入面板 ================= */
-        .input-overlay { display: none; position: fixed; inset: 0; background-color: rgba(0,0,0,0.4); z-index: 200; animation: fadeIn 0.3s; }
-        .input-overlay.show { display: block; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+                let title = "今日留白";
+                let bodyText = "这一天没有留下文字，只在时光里安静地流淌。";
+                
+                if (aiReply) {
+                    const textLines = aiReply.content.split('\n').filter(l => l.trim() !== '');
+                    title = textLines[0].substring(0, 12) + (textLines[0].length > 12 ? '...' : '');
+                    bodyText = aiReply.content;
+                } else if (userText) {
+                    title = "碎碎念";
+                    bodyText = userText.content;
+                }
 
-        .input-panel { position: fixed; bottom: -100%; left: 0; right: 0; background-color: var(--bg-color); border-radius: 20px 20px 0 0; padding: 20px 24px calc(20px + env(safe-area-inset-bottom)); z-index: 201; transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 -4px 20px rgba(0,0,0,0.05); }
-        .input-panel.show { bottom: 0; }
-        
-        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .panel-header h3 { font-family: "KaiTi", "STKaiti", serif; font-size: 18px; margin: 0; font-weight: 600; }
-        .close-btn { font-size: 20px; color: var(--text-sub); cursor: pointer; padding: 5px; }
+                let imgHtml = userImage ? `<img src="${userImage.content}" class="content-image">` : '';
 
-        .textarea-box { width: 100%; height: 120px; background-color: #FFFFFF; border: 1px solid #EFEFEF; border-radius: 12px; padding: 15px; font-size: 15px; line-height: 1.6; outline: none; resize: none; margin-bottom: 20px; font-family: inherit; }
-        
-        .panel-actions { display: flex; justify-content: space-between; align-items: center; }
-        .media-btns { display: flex; gap: 20px; }
-        .media-btn { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-sub); cursor: pointer; gap: 4px; }
-        .media-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; }
-        
-        .save-btn { background-color: var(--sage-green); color: white; border: none; padding: 10px 24px; border-radius: 20px; font-size: 15px; cursor: pointer; }
-        .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    </style>
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'day-group';
+                groupDiv.onclick = () => openModal(dateStr, dayData);
+
+                groupDiv.innerHTML = `
+                    <div class="date-side">
+                        <div class="date-num">${day}</div>
+                        <div class="date-month">${month}</div>
+                    </div>
+                    <div class="timeline-track"><div class="dot"></div></div>
+                    <div class="content-side">
+                        <h3 class="content-title">${title}</h3>
+                        ${imgHtml}
+                        <p class="content-text">${bodyText}</p>
+                    </div>
+                `;
+                timelineContainer.appendChild(groupDiv);
+            });
+        }
+
+        window.onload = function() { renderTimeline(); };
+
+        // ================= 输入面板交互 =================
+        function openInputPanel() {
+            inputOverlay.classList.add('show');
+            inputPanel.classList.add('show');
+            setTimeout(() => messageInput.focus(), 300);
+        }
+
+        function closeInputPanel() {
+            inputOverlay.classList.remove('show');
+            inputPanel.classList.remove('show');
+            messageInput.value = '';
+            currentBase64Image = null;
+        }
+
+        // 图片选择
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                alert("图片太大了，请选择5MB以内的图片哦～");
+                imageInput.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                currentBase64Image = event.target.result;
+                showToast("图片已附加");
+            };
+            reader.readAsDataURL(file);
+            imageInput.value = ''; 
+        });
+
+        // 保存记录
+        async function saveRecord() {
+            const text = messageInput.value.trim();
+            if (!text && !currentBase64Image) return;
+
+            closeInputPanel();
+            
+            if (text) saveToHistory('text', 'user', text);
+            if (currentBase64Image) saveToHistory('image', 'user', currentBase64Image);
+            
+            showToast("拾间正在感受...");
+
+            let contentArray = [];
+            if (text) contentArray.push({ type: "text", text: text });
+            if (currentBase64Image) contentArray.push({ type: "image_url", image_url: { url: currentBase64Image } });
+            
+            // 如果有图片，加一句提示词
+            if (currentBase64Image && !text) {
+                contentArray.unshift({ type: "text", text: "请看看这张图片，提取场景或感受意境，写一段时光切片。" });
+            }
+
+            await callAI(contentArray);
+            renderTimeline();
+        }
+
+        async function callAI(contentArray) {
+            try {
+                const response = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: "glm-4v", messages: [{ role: "user", content: contentArray }] })
+                });
+                
+                if (!response.ok) throw new Error("网络请求失败");
+                const data = await response.json();
+                if (data.choices && data.choices.length > 0) {
+                    saveToHistory('text', 'ai', data.choices[0].message.content); 
+                }
+            } catch (error) {
+                console.error(error);
+                showToast("⚠️ 反应超时了，请重试"); 
+            }
+        }
+
+        function saveToHistory(type, role, content) {
+            const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            history.push({ type, role, content, time: new Date().toISOString() });
+            localStorage.setItem('shijian_history', JSON.stringify(history));
+        }
+
+        function exportData() {
+            const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            if (history.length === 0) return alert("现在还是纯白的留白，没有任何记录可以导出哦。");
+
+            let textContent = "【拾间 · 我的时光切片】\n\n";
+            history.sort((a, b) => new Date(a.time) - new Date(b.time)).forEach(item => {
+                const dateStr = new Date(item.time).toLocaleString();
+                if (item.type === 'text') {
+                    textContent += `[${dateStr}] ${item.role === 'user' ? '【我】' : '【拾间】'}：${item.content}\n`;
+                } else if (item.type === 'image') {
+                    textContent += `[${dateStr}] 【我】：（上传了一张图片/截图）\n`;
+                }
+            });
+
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `拾间_时光流_${new Date().toLocaleDateString()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ================= 方案A：单日卡片全屏展开 =================
+        function openModal(dateStr, dayData) {
+            const modal = document.getElementById('detailModal');
+            const content = document.getElementById('modalContent');
+            
+            const dateObj = new Date(dateStr);
+            const dateTitle = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+
+            const aiReply = dayData.find(d => d.role === 'ai' && d.type === 'text');
+            const userImage = dayData.find(d => d.role === 'user' && d.type === 'image');
+            
+            let html = `<div style="display:flex; justify-content:flex-end; margin-bottom:20px;"><div style="font-size:20px; color:var(--text-sub); cursor:pointer;" onclick="closeModal()">✕</div></div>`;
+            html += `<div style="background-color:#FFF; border-radius:12px; padding:24px; box-shadow:0 4px 20px rgba(0,0,0,0.03);">
+                        <div style="font-size:12px; color:var(--text-sub); margin-bottom:8px; letter-spacing:1px;">${dateTitle}</div>
+                        <h2 style="font-family:'KaiTi'; font-size:24px; margin:0 0 20px 0;">${aiReply ? aiReply.content.split('\n')[0].substring(0,15) : '今日留白'}</h2>`;
+            
+            if (userImage) html += `<img src="${userImage.content}" style="width:100%; border-radius:8px; margin-bottom:20px;">`;
+            html += `<p style="font-size:15px; color:#333; line-height:1.8; margin:0;">${aiReply ? aiReply.content : '这一天没有文字记录。'}</p></div>`;
+
+            content.innerHTML = html;
+            modal.style.display = 'block';
+            content.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+            document.getElementById('modalContent').style.display = 'none';
+        }
+    </script>
 </head>
 <body>
 
