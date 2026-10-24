@@ -154,12 +154,19 @@
         const imageInput = document.getElementById('imageInput');
         const inputArea = document.getElementById('inputArea');
 
-        // ================= 核心渲染逻辑 =================
+               // 新增一个轻提示（Toast）函数，用于反馈状态
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.innerText = msg;
+            toast.style.cssText = "position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:rgba(0,0,0,0.7); color:white; padding:10px 20px; border-radius:20px; font-size:14px; z-index:9999; transition:opacity 0.3s;";
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2000);
+        }
+
         function renderTimeline() {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
             const groupedByDay = {};
             
-            // 按日期分组
             history.forEach(item => {
                 if (!item.time) return;
                 const dateObj = new Date(item.time);
@@ -172,11 +179,10 @@
             const sortedDates = Object.keys(groupedByDay).sort((a, b) => new Date(b) - new Date(a));
             
             if (sortedDates.length === 0) {
-                timelineContainer.innerHTML = '<div style="text-align:center; color:#999; margin-top:60px; font-size:14px;">还没有记录<br><br>去留下你的第一笔时光吧</div>';
+                timelineContainer.innerHTML = '<div style="text-align:center; color:#999; margin-top:60px; font-size:14px; line-height: 2;">还没有记录<br>去留下你的第一笔时光吧</div>';
                 return;
             }
 
-            // 渲染时间线
             sortedDates.forEach(dateStr => {
                 const dayData = groupedByDay[dateStr];
                 const dateObj = new Date(dateStr);
@@ -223,7 +229,6 @@
             });
         }
 
-        // 页面加载
         window.onload = function() { renderTimeline(); };
 
         // ================= 输入交互 =================
@@ -232,29 +237,38 @@
             if (inputArea.classList.contains('show')) messageInput.focus();
         }
 
-        async function sendMessage() {
+               async function sendMessage() {
             const text = messageInput.value.trim(); 
             if (!text) return; 
 
             messageInput.value = '';
-            inputArea.classList.remove('show');
             
             saveToHistory('text', 'user', text);
+            showToast("拾间正在感受..."); // 提示用户正在处理
+            
             const contentArray = [{ type: "text", text: text }];
             await callAI(contentArray);
             renderTimeline();
         }
 
-        imageInput.addEventListener('change', function(e) {
+                imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
+
+            // 图片大小保护（限制3MB以内，防止超时）
+            if (file.size > 3 * 1024 * 1024) {
+                alert("这张图片有点大哦，请截图裁剪小一点再发，或者换一张～");
+                imageInput.value = '';
+                return;
+            }
 
             const reader = new FileReader();
             reader.onload = async function(event) {
                 const base64Image = event.target.result;
-                inputArea.classList.remove('show');
                 
                 saveToHistory('image', 'user', base64Image);
+                showToast("拾间正在凝视照片..."); // 提示用户正在处理
+
                 const contentArray = [
                     { type: "text", text: "请看我发给你的这张消费截图或照片。请提取其中的场景，并写一段不超过100字的《今日时光切片》。" },
                     { type: "image_url", image_url: { url: base64Image } }
