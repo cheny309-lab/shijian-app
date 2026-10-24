@@ -234,27 +234,22 @@
 
         window.onload = function() { renderTimeline(); };
 
-        // ================= 输入交互 =================
-        function toggleInput() {
-            inputArea.classList.toggle('show');
-            if (inputArea.classList.contains('show')) messageInput.focus();
-        }
-
-               async function sendMessage() {
+             // ================= 输入交互 =================
+        async function sendMessage() {
             const text = messageInput.value.trim(); 
             if (!text) return; 
 
             messageInput.value = '';
             
             saveToHistory('text', 'user', text);
-            showToast("拾间正在感受..."); // 提示用户正在处理
+            showToast("拾间正在感受..."); 
             
             const contentArray = [{ type: "text", text: text }];
             await callAI(contentArray);
             renderTimeline();
         }
 
-                imageInput.addEventListener('change', function(e) {
+        imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
 
@@ -270,9 +265,9 @@
                 const base64Image = event.target.result;
                 
                 saveToHistory('image', 'user', base64Image);
-                showToast("拾间正在凝视照片..."); // 提示用户正在处理
+                showToast("拾间正在凝视照片..."); 
 
-                               const contentArray = [
+                const contentArray = [
                     { type: "text", text: "请看看这张图片。如果是一张账单截图，请提取消费场景；如果是一张风景或生活照片，请感受它的意境。然后写一段不超过100字的《今日时光切片》，就像老朋友一样。" },
                     { type: "image_url", image_url: { url: base64Image } }
                 ];
@@ -294,13 +289,18 @@
                         messages: [{ role: "user", content: contentArray }]
                     })
                 });
+                
+                if (!response.ok) throw new Error("网络请求失败");
+                
                 const data = await response.json();
                 if (data.choices && data.choices.length > 0) {
                     saveToHistory('text', 'ai', data.choices[0].message.content); 
+                } else {
+                    throw new Error("AI没有返回有效内容");
                 }
             } catch (error) {
                 console.error(error);
-                alert("连接大脑失败了，稍后再试。");
+                showToast("⚠️ 反应超时了，可能网络不好，请重新试一次哦"); 
             }
         }
 
