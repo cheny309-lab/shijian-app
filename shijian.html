@@ -94,8 +94,7 @@
         <div class="header-right" onclick="exportData()">🍃</div>
     </div>
 
-    <div class="timeline-container" id="timelineContainer">
-    </div>
+    <div class="timeline-container" id="timelineContainer"></div>
 
     <div class="bottom-container">
         <div class="record-btn-wrapper">
@@ -143,7 +142,7 @@
         <div id="modalContent"></div>
     </div>
 
-         <script>
+    <script>
         // ========================================================
         // 模块 1：全局变量与基础工具
         // ========================================================
@@ -163,7 +162,7 @@
         }
 
         // ========================================================
-        // 模块 2：渲染时间流（主界面）
+        // 模块 2：渲染时间流
         // ========================================================
         function renderTimeline() {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
@@ -232,7 +231,7 @@
         window.onload = function() { renderTimeline(); };
 
         // ========================================================
-        // 模块 3：底部输入面板与图片压缩处理
+        // 模块 3：输入面板与图片处理
         // ========================================================
         function openInputPanel() {
             inputOverlay.classList.add('show');
@@ -277,72 +276,117 @@
             imageInput.value = ''; 
         });
 
-               // ========================================================
-        // 模块 4：保存记录与发送请求
+        // ========================================================
+        // 模块 4：保存记录（带强力报错弹窗拦截）
         // ========================================================
         async function saveRecord() {
             const text = messageInput.value.trim();
-            
             if (!text && !currentBase64Image) {
                 showToast("写点什么，或者加张图片吧～");
                 return;
             }
 
-            // 1. 先获取数据并关闭面板，避免重复点击
             const currentText = text;
             const currentImg = currentBase64Image;
-            closeInputPanel(); 
+            closeInputPanel();
             
             if (currentText) saveToHistory('text', 'user', currentText);
             if (currentImg) saveToHistory('image', 'user', currentImg);
             
             showToast("拾间正在感受...");
 
-            // 2. 组装数据
             let contentArray = [];
             if (currentText) contentArray.push({ type: "text", text: currentText });
-            if (currentImg) {
-                contentArray.push({ type: "image_url", image_url: { url: currentImg } });
-            }
-            if (currentImg && !currentText) {
-                contentArray.unshift({ type: "text", text: "请看看这张图片，提取场景或感受意境，写一段时光切片。" });
-            }
+            if (currentImg) contentArray.push({ type: "image_url", image_url: { url: currentImg } });
+            if (currentImg && !currentText) contentArray.unshift({ type: "text", text: "请看看这张图片，提取场景或感受意境，写一段时光切片。" });
 
-            // 3. 呼叫 AI（加入超时机制）
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
-
                 const response = await fetch("/api/chat", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ messages: [{ role: "user", content: contentArray }] }),
-                    signal: controller.signal
+                    body: JSON.stringify({ messages: [{ role: "user", content: contentArray }] })
                 });
                 
-                clearTimeout(timeoutId); // 成功收到回复，清除定时器
-                
-                if (!response.ok) throw new Error("网络请求失败");
+                // 【强力拦截】：如果后端返回非200状态，直接弹窗暴露错误
+                if (!response.ok) {
+                    const errData = await response.json();
+                    alert("🚨 云端报错啦：\n" + JSON.stringify(errData));
+                    throw new Error("网络请求失败");
+                }
                 
                 const data = await response.json();
                 if (data.choices && data.choices.length > 0) {
                     saveToHistory('text', 'ai', data.choices[0].message.content); 
-                    renderTimeline(); // 成功后再刷新界面
+                    renderTimeline();
                 } else {
-                    throw new Error("返回数据格式错误");
+                    // 【强力拦截】：如果没拿到回复，也弹窗
+                    alert("🚨 数据异常，未收到AI回复：\n" + JSON.stringify(data));
                 }
             } catch (error) {
-                console.error("请求出错:", error);
-                showToast("⚠️ 拾间走神了，请稍后再试");
+                console.error(error);
+                showToast("⚠️ 反应超时了，请重试"); 
             }
         }
+
         // ========================================================
-        // 模块 5：数据本地存储与导出
+        // 模块 5：数据存储与导出
         // ========================================================
         function saveToHistory(type, role, content) {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
             history.push({ type, role, content, time: new Date().toISOString() });
             localStorage.setItem('shijian_history', JSON.stringify(history));
+        }
+
+        function exportData() {
+            const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            if (history.length === 0) return alert("现在还是纯白的留白，没有任何记录可以导出哦。");
+
+            let textContent = "【拾间 · 我的时光切片】\n\n";
+            history.sort((a, b) => new Date(a.time) - new Date(b.time)).forEach(item => {
+                const dateStr = new Date(item.time).toLocaleString();
+                if (item.type === 'text') {
+                    textContent += `[${dateStr}] ${item.role === 'user' ? '【我】' : '【拾间】'}：${item.content}\n`;
+                } else if (item.type === 'image') {
+                    textContent += `[${dateStr}] 【我】：（上传了一张图片/截图）\n`;
+                }
+            });
+
+            const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `拾间_时光流_${new Date().toLocaleDateString()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ========================================================
+        // 模块 6：详情页弹窗
+        // ========================================================
+        function openModal(dateStr, dayData) {
+            const modal = document.getElementById('detailModal');
+            const content = document.getElementById('modalContent');
+            const dateObj = new Date(dateStr);
+            const dateTitle = `${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+
+            const aiReply = dayData.find(d => d.role === 'ai' && d.type === 'text');
+            const userImage = dayData.find(d => d.role === 'user' && d.type === 'image');
+            
+            let html = `<div class="detail-card">
+                            <div class="detail-date">${dateTitle}</div>
+                            <h2 class="detail-title">${aiReply ? aiReply.content.split('\n')[0].substring(0,15) : '今日留白'}</h2>`;
+            
+            if (userImage) html += `<img src="${userImage.content}" class="detail-image">`;
+            html += `<p class="detail-text">${aiReply ? aiReply.content : '这一天没有文字记录。'}</p></div>`;
+
+            content.innerHTML = html;
+            modal.classList.add('show');
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').classList.remove('show');
         }
     </script>
 </body>
