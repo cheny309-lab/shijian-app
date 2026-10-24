@@ -144,6 +144,9 @@
     </div>
 
     <script>
+        // ========================================================
+        // 模块 1：全局变量与基础工具
+        // ========================================================
         const timelineContainer = document.getElementById('timelineContainer');
         const messageInput = document.getElementById('messageInput');
         const imageInput = document.getElementById('imageInput');
@@ -151,6 +154,7 @@
         const inputPanel = document.getElementById('inputPanel');
         let currentBase64Image = null;
 
+        // 提示框工具
         function showToast(msg) {
             const toast = document.createElement('div');
             toast.innerText = msg;
@@ -159,6 +163,9 @@
             setTimeout(() => { toast.remove(); }, 2000);
         }
 
+        // ========================================================
+        // 模块 2：渲染时间流（主界面）
+        // ========================================================
         function renderTimeline() {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
             const groupedByDay = {};
@@ -225,6 +232,9 @@
 
         window.onload = function() { renderTimeline(); };
 
+        // ========================================================
+        // 模块 3：底部输入面板与图片选择
+        // ========================================================
         function openInputPanel() {
             inputOverlay.classList.add('show');
             inputPanel.classList.add('show');
@@ -250,9 +260,17 @@
             imageInput.value = ''; 
         });
 
+        // ========================================================
+        // 模块 4：保存记录与呼叫 AI
+        // ========================================================
         async function saveRecord() {
             const text = messageInput.value.trim();
-            if (!text && !currentBase64Image) return;
+            
+            // 防呆提示：解决“点保存没反应”
+            if (!text && !currentBase64Image) {
+                showToast("写点什么，或者加张图片吧～");
+                return;
+            }
 
             closeInputPanel();
             
@@ -292,6 +310,9 @@
             }
         }
 
+        // ========================================================
+        // 模块 5：数据存储与导出
+        // ========================================================
         function saveToHistory(type, role, content) {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
             history.push({ type, role, content, time: new Date().toISOString() });
@@ -323,6 +344,9 @@
             URL.revokeObjectURL(url);
         }
 
+        // ========================================================
+        // 模块 6：单日卡片详情弹窗（方案 A）
+        // ========================================================
         function openModal(dateStr, dayData) {
             const modal = document.getElementById('detailModal');
             const content = document.getElementById('modalContent');
