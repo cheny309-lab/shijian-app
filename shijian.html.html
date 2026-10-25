@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拾间</title>
+    
+    <style>
+        /* ========================================================
+           模块 1：全局样式与时间轴（纯展示）
+           ======================================================== */
+        :root { --bg-color: #F7F6F2; --text-main: #2C2C2C; --text-sub: #999999; --sage-green: #8DA38E; --line-color: #E8E6E1; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-color); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; color: var(--text-main); overflow: hidden; }
+        .header { padding: 24px 24px 10px 24px; display: flex; justify-content: space-between; align-items: flex-start; }
+        .header-left h1 { font-family: "KaiTi", "STKaiti", serif; font-size: 26px; font-weight: 600; margin: 0 0 6px 0; letter-spacing: 2px; }
+        .header-left p { font-size: 12px; color: var(--text-sub); margin: 0; }
+        .header-right { font-size: 20px; cursor: pointer; opacity: 0.8; padding: 5px; }
+        .timeline-container { flex: 1; overflow-y: auto; padding: 10px 24px 120px 24px; }
+        .day-group { display: flex; margin-bottom: 36px; cursor: pointer; }
+        .date-side { width: 45px; flex-shrink: 0; padding-top: 2px; }
+        .date-num { font-size: 20px; line-height: 1; }
+        .date-month { font-size: 10px; color: var(--text-sub); margin-top: 4px; }
+        .timeline-track { width: 20px; flex-shrink: 0; position: relative; display: flex; justify-content: center; }
+        .timeline-track::before { content: ''; position: absolute; top: 10px; bottom: -45px; width: 1px; background-color: var(--line-color); z-index: 1; }
+        .day-group:last-child .timeline-track::before { display: none; }
+        .dot { width: 5px; height: 5px; background-color: var(--sage-green); border-radius: 50%; margin-top: 8px; z-index: 2; position: relative; }
+        .content-side { flex: 1; padding-left: 8px; }
+        .content-title { font-family: "KaiTi", "STKaiti", serif; font-size: 18px; margin: 0 0 8px 0; }
+        .content-text { font-size: 14px; color: #555; line-height: 1.6; margin: 0 0 12px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .content-image { width: 100%; max-width: 200px; border-radius: 6px; margin-bottom: 12px; display: block; object-fit: cover; }
+
+        /* ========================================================
+           模块 2：底部导航与输入面板
+           ======================================================== */
+        .bottom-container { position: fixed; bottom: 0; left: 0; right: 0; padding-bottom: env(safe-area-inset-bottom); background-color: var(--bg-color); z-index: 100; }
+        .record-btn-wrapper { display: flex; justify-content: center; margin-bottom: 15px; }
+        .record-btn { background-color: var(--sage-green); color: white; border: none; padding: 12px 28px; border-radius: 30px; font-size: 15px; font-weight: 500; box-shadow: 0 4px 12px rgba(141, 163, 142, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .bottom-nav { display: flex; justify-content: space-around; align-items: center; padding: 10px 0 15px 0; border-top: 1px solid #EBEAE6; background-color: var(--bg-color); }
+        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-sub); cursor: pointer; }
+        .nav-item.active { color: var(--text-main); }
+        .icon-home { width: 18px; height: 18px; border: 1.5px solid currentColor; border-radius: 4px; position: relative; margin-bottom: 4px; }
+        .icon-home::before { content: ''; position: absolute; top: -4px; left: 2px; width: 10px; height: 10px; border-top: 1.5px solid currentColor; border-left: 1.5px solid currentColor; transform: rotate(45deg); background-color: var(--bg-color); }
+        .icon-list { width: 16px; height: 18px; border: 1.5px solid currentColor; border-radius: 2px; position: relative; margin-bottom: 4px; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; }
+        .icon-list::before, .icon-list::after { content: ''; width: 8px; height: 1px; background-color: currentColor; }
+        .icon-user { width: 16px; height: 16px; border: 1.5px solid currentColor; border-radius: 50%; position: relative; margin-bottom: 4px; }
+        .icon-user::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 20px; height: 10px; border-top: 1.5px solid currentColor; border-radius: 10px 10px 0 0; }
+        .input-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.4); z-index: 200; }
+        .input-overlay.show { display: block; }
+        .input-panel { position: fixed; bottom: -100%; left: 0; right: 0; background-color: var(--bg-color); border-radius: 20px 20px 0 0; padding: 20px 24px; z-index: 201; transition: bottom 0.3s; box-shadow: 0 -4px 20px rgba(0,0,0,0.05); }
+        .input-panel.show { bottom: 0; }
+        .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .panel-header h3 { font-family: "KaiTi", "STKaiti", serif; font-size: 18px; margin: 0; }
+        .close-btn { font-size: 20px; color: var(--text-sub); cursor: pointer; padding: 5px; }
+        .textarea-box { width: 100%; height: 120px; background-color: #FFFFFF; border: 1px solid #EFEFEF; border-radius: 12px; padding: 15px; font-size: 15px; outline: none; resize: none; margin-bottom: 20px; font-family: inherit; }
+        .panel-actions { display: flex; justify-content: space-between; align-items: center; }
+        .media-btns { display: flex; gap: 20px; }
+        .media-btn { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-sub); cursor: pointer; gap: 4px; }
+        .media-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; }
+        .save-btn { background-color: var(--sage-green); color: white; border: none; padding: 10px 24px; border-radius: 20px; font-size: 15px; cursor: pointer; }
+
+        /* ========================================================
+           模块 3：详情弹窗与报错面板
+           ======================================================== */
+        .detail-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-color); z-index: 300; overflow-y: auto; padding: 24px; }
+        .detail-overlay.show { display: block; }
+        .detail-card { background-color: #FFF; border-radius: 12px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
+        .detail-date { font-size: 12px; color: var(--text-sub); margin-bottom: 8px; }
+        .detail-title { font-family: "KaiTi", "STKaiti", serif; font-size: 24px; margin: 0 0 20px 0; }
+        .detail-image { width: 100%; border-radius: 8px; margin-bottom: 20px; }
+        .detail-text { font-size: 15px; color: #333; line-height: 1.8; margin: 0; }
+        #debug-panel { display:none; position:fixed; bottom:0; left:0; right:0; background:rgba(0,0,0,0.9); color:#ff5555; padding:15px; font-size:12px; z-index:99999; max-height:30vh; overflow-y:auto; font-family:monospace; white-space:pre-wrap; }
+    </style>
+</head>
+<body>
+
+    <div id="debug-panel"></div>
+
+    <!-- 模块 A：顶部与时间轴 -->
+    <div class="header">
+        <div class="header-left"><h1>拾间</h1><p>2026年10月</p></div>
+        <div class="header-right" onclick="exportData()">🍃</div>
+    </div>
+    <div class="timeline-container" id="timelineContainer"></div>
+
+    <!-- 模块 B：底部导航栏 -->
+    <div class="bottom-container">
+        <div class="record-btn-wrapper">
+            <button class="record-btn" onclick="openInputPanel()"><span>＋</span> 留下此刻</button>
+        </div>
+        <div class="bottom-nav">
+            <div class="nav-item active"><div class="icon-home"></div>时光</div>
+            <div class="nav-item"><div class="icon-list"></div>账单</div>
+            <div class="nav-item"><div class="icon-user"></div>我的</div>
+        </div>
+    </div>
+
+    <!-- 模块 C：输入面板 -->
+    <div class="input-overlay" id="inputOverlay" onclick="closeInputPanel()"></div>
+    <div class="input-panel" id="inputPanel">
+        <div class="panel-header"><h3>留下此刻</h3><div class="close-btn" onclick="closeInputPanel()">✕</div></div>
+        <textarea class="textarea-box" id="messageInput" placeholder="今晚加班到很晚，吃了一顿烧烤。"></textarea>
+        <div class="panel-actions">
+            <div class="media-btns">
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                <div class="media-btn" onclick="document.getElementById('imageInput').click()">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg><span>图片</span>
+                </div>
+            </div>
+            <button class="save-btn" onclick="saveRecord()">保存</button>
+        </div>
+    </div>
+
+    <!-- 模块 D：详情弹窗 -->
+    <div class="detail-overlay" id="detailModal">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
+            <div style="font-size:20px; color:var(--text-sub); cursor:pointer; padding:5px;" onclick="closeModal()">✕</div>
+        </div>
+        <div id="modalContent"></div>
+    </div>
+
+    <script>
+        // ========================================================
+        // JS 模块 1：全局变量与基础工具
+        // ========================================================
+        const timelineContainer = document.getElementById('timelineContainer');
+        const messageInput = document.getElementById('messageInput');
+        const imageInput = document.getElementById('imageInput');
+        const inputOverlay = document.getElementById('inputOverlay');
+        const inputPanel = document.getElementById('inputPanel');
+        let currentBase64Image = null;
+
+        window.onerror = function(message, source, lineno, colno, error) {
+            const panel = document.getElementById('debug-panel');
+            panel.style.display = 'block';
+            panel.innerText += `\n⚠️ JS错误: ${message} (第${lineno}行)`;
+        };
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.innerText = msg;
+            toast.style.cssText = "position:fixed; top:20%; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.8); color:white; padding:10px 20px; border-radius:20px; font-size:14px; z-index:9999;";
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 2000);
+        }
+
+        // ========================================================
+        // JS 模块 2：渲染时间流
+        // ========================================================
+        function renderTimeline() {
+            const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            const groupedByDay = {};
+            history.forEach(item => {
+                if (!item.time) return;
+                const d = new Date(item.time);
+                const str = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                if (!groupedByDay[str]) groupedByDay[str] = [];
+                groupedByDay[str].push(item);
+            });
+
+            timelineContainer.innerHTML = '';
+            const sortedDates = Object.keys(groupedByDay).sort((a,b) => new Date(b)-new Date(a));
+            if (sortedDates.length === 0) {
+                timelineContainer.innerHTML = '<div style="text-align:center; color:#999; margin-top:80px;">这里，留给你的日常。</div>';
+                return;
+            }
+
+            sortedDates.forEach(dateStr => {
+                const dayData = groupedByDay[dateStr];
+                const d = new Date(dateStr);
+                const ai = dayData.find(x => x.role === 'ai' && x.type === 'text');
+                const img = dayData.find(x => x.role === 'user' && x.type === 'image');
+                const txt = dayData.find(x => x.role === 'user' && x.type === 'text');
+                let title = ai ? ai.content.split('\n')[0].substring(0,12) : (txt ? "碎碎念" : "今日留白");
+                let body = ai ? ai.content : (txt ? txt.content : "这一天没有留下文字。");
+                let imgHtml = img ? `<img src="${img.content}" class="content-image">` : '';
+                
+                const div = document.createElement('div');
+                div.className = 'day-group';
+                div.onclick = () => openModal(dateStr, dayData);
+                div.innerHTML = `
+                    <div class="date-side"><div class="date-num">${String(d.getDate()).padStart(2,'0')}</div><div class="date-month">${d.getMonth()+1}月</div></div>
+                    <div class="timeline-track"><div class="dot"></div></div>
+                    <div class="content-side"><h3 class="content-title">${title}</h3>${imgHtml}<p class="content-text">${body}</p></div>
+                `;
+                timelineContainer.appendChild(div);
+            });
+        }
+        window.onload = renderTimeline;
+
+        // ========================================================
+        // JS 模块 3：输入面板与图片压缩
+        // ========================================================
+        function openInputPanel() { inputOverlay.classList.add('show'); inputPanel.classList.add('show'); }
+        function closeInputPanel() { inputOverlay.classList.remove('show'); inputPanel.classList.remove('show'); messageInput.value = ''; currentBase64Image = null; }
+
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 800; canvas.height = img.height * (800 / img.width);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    currentBase64Image = canvas.toDataURL('image/jpeg', 0.8); 
+                    showToast("图片已附加");
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // ========================================================
+        // JS 模块 4：保存记录与请求（带网络重试提示）
+        // ========================================================
+        async function saveRecord() {
+            const text = messageInput.value.trim();
+            if (!text && !currentBase64Image) return showToast("写点什么吧～");
+
+            const t = text, i = currentBase64Image;
+            closeInputPanel();
+            if (t) saveToHistory('text', 'user', t);
+            if (i) saveToHistory('image', 'user', i);
+            
+            showToast("拾间正在感受...");
+            let arr = [];
+            if (t) arr.push({ type: "text", text: t });
+            if (i) arr.push({ type: "image_url", image_url: { url: i } });
+            if (i && !t) arr.unshift({ type: "text", text: "请看看这张图片。" });
+
+            try {
+                const res = await fetch("/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ messages: [{ role: "user", content: arr }] })
+                });
+                
+                if (!res.ok) {
+                    showToast("拾间暂时没听清，再试一次好吗？");
+                    return;
+                }
+                
+                const data = await res.json();
+                if (data.choices) {
+                    saveToHistory('text', 'ai', data.choices[0].message.content); 
+                    renderTimeline();
+                } else {
+                    showToast("拾间走神了，再试一次～");
+                }
+            } catch (e) {
+                // 针对断网/超时的友好提示
+                showToast("网络开小差了，请再点一次保存");
+            }
+        }
+
+        // ========================================================
+        // JS 模块 5：存储与导出
+        // ========================================================
+        function saveToHistory(type, role, content) {
+            const h = JSON.parse(localStorage.getItem('shijian_history') || '[]');
+            h.push({ type, role, content, time: new Date().toISOString() });
+            localStorage.setItem('shijian_history', JSON.stringify(h));
+        }
+
+        function exportData() { alert("导出功能已保留"); }
+
+        // ========================================================
+        // JS 模块 6：详情弹窗控制
+        // ========================================================
+        function openModal(dateStr, dayData) {
+            const ai = dayData.find(x => x.role === 'ai');
+            const img = dayData.find(x => x.type === 'image');
+            let html = `<div class="detail-card">
+                            <div class="detail-date">${dateStr}</div>
+                            <h2 class="detail-title">${ai ? ai.content.split('\n')[0].substring(0,15) : '今日留白'}</h2>`;
+            if (img) html += `<img src="${img.content}" class="detail-image">`;
+            html += `<p class="detail-text">${ai ? ai.content : '这一天没有文字记录。'}</p></div>`;
+            
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('detailModal').classList.add('show');
+        }
+        function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
+    </script>
+</body>
+</html>
