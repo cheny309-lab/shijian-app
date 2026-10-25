@@ -6,14 +6,15 @@
     <title>拾间</title>
     
     <style>
-        /* CSS 样式保持不变，直接沿用你刚才的即可 */
         :root { --bg-color: #F7F6F2; --text-main: #2C2C2C; --text-sub: #999999; --sage-green: #8DA38E; --line-color: #E8E6E1; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background-color: var(--bg-color); font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; color: var(--text-main); overflow: hidden; }
+        
         .header { padding: 24px 24px 10px 24px; display: flex; justify-content: space-between; align-items: flex-start; }
         .header-left h1 { font-family: "KaiTi", "STKaiti", serif; font-size: 26px; font-weight: 600; margin: 0 0 6px 0; letter-spacing: 2px; }
         .header-left p { font-size: 12px; color: var(--text-sub); margin: 0; }
         .header-right { font-size: 20px; cursor: pointer; opacity: 0.8; padding: 5px; }
+
         .timeline-container { flex: 1; overflow-y: auto; padding: 10px 24px 120px 24px; }
         .day-group { display: flex; margin-bottom: 36px; cursor: pointer; }
         .date-side { width: 45px; flex-shrink: 0; padding-top: 2px; }
@@ -27,9 +28,11 @@
         .content-title { font-family: "KaiTi", "STKaiti", serif; font-size: 18px; margin: 0 0 8px 0; }
         .content-text { font-size: 14px; color: #555; line-height: 1.6; margin: 0 0 12px 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .content-image { width: 100%; max-width: 200px; border-radius: 6px; margin-bottom: 12px; display: block; object-fit: cover; }
+
         .bottom-container { position: fixed; bottom: 0; left: 0; right: 0; padding-bottom: env(safe-area-inset-bottom); background-color: var(--bg-color); z-index: 100; }
         .record-btn-wrapper { display: flex; justify-content: center; margin-bottom: 15px; }
         .record-btn { background-color: var(--sage-green); color: white; border: none; padding: 12px 28px; border-radius: 30px; font-size: 15px; font-weight: 500; box-shadow: 0 4px 12px rgba(141, 163, 142, 0.3); cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        
         .bottom-nav { display: flex; justify-content: space-around; align-items: center; padding: 10px 0 15px 0; border-top: 1px solid #EBEAE6; background-color: var(--bg-color); }
         .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-sub); cursor: pointer; }
         .nav-item.active { color: var(--text-main); }
@@ -39,6 +42,8 @@
         .icon-list::before, .icon-list::after { content: ''; width: 8px; height: 1px; background-color: currentColor; }
         .icon-user { width: 16px; height: 16px; border: 1.5px solid currentColor; border-radius: 50%; position: relative; margin-bottom: 4px; }
         .icon-user::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 20px; height: 10px; border-top: 1.5px solid currentColor; border-radius: 10px 10px 0 0; }
+
+        /* 输入面板样式 */
         .input-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.4); z-index: 200; }
         .input-overlay.show { display: block; }
         .input-panel { position: fixed; bottom: -100%; left: 0; right: 0; background-color: var(--bg-color); border-radius: 20px 20px 0 0; padding: 20px 24px; z-index: 201; transition: bottom 0.3s; box-shadow: 0 -4px 20px rgba(0,0,0,0.05); }
@@ -52,14 +57,21 @@
         .media-btn { display: flex; flex-direction: column; align-items: center; font-size: 11px; color: var(--text-sub); cursor: pointer; gap: 4px; }
         .media-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.5; }
         .save-btn { background-color: var(--sage-green); color: white; border: none; padding: 10px 24px; border-radius: 20px; font-size: 15px; cursor: pointer; }
+
+        /* 详情弹窗面板 */
+        .detail-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--bg-color); z-index: 300; overflow-y: auto; padding: 24px; }
+        .detail-overlay.show { display: block; }
+        .detail-card { background-color: #FFF; border-radius: 12px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
+        .detail-date { font-size: 12px; color: var(--text-sub); margin-bottom: 8px; }
+        .detail-title { font-family: "KaiTi", "STKaiti", serif; font-size: 24px; margin: 0 0 20px 0; }
+        .detail-image { width: 100%; border-radius: 8px; margin-bottom: 20px; }
+        .detail-text { font-size: 15px; color: #333; line-height: 1.8; margin: 0; }
         
-        /* 调试面板样式 */
         #debug-panel { display:none; position:fixed; bottom:0; left:0; right:0; background:rgba(0,0,0,0.9); color:#ff5555; padding:15px; font-size:12px; z-index:99999; max-height:30vh; overflow-y:auto; font-family:monospace; white-space:pre-wrap; }
     </style>
 </head>
 <body>
 
-    <!-- 调试黑框 -->
     <div id="debug-panel"></div>
 
     <div class="header">
@@ -80,6 +92,7 @@
         </div>
     </div>
 
+    <!-- 输入面板 -->
     <div class="input-overlay" id="inputOverlay" onclick="closeInputPanel()"></div>
     <div class="input-panel" id="inputPanel">
         <div class="panel-header"><h3>留下此刻</h3><div class="close-btn" onclick="closeInputPanel()">✕</div></div>
@@ -95,7 +108,18 @@
         </div>
     </div>
 
+    <!-- 详情弹窗（刚刚丢失的模块，现在补回来了） -->
+    <div class="detail-overlay" id="detailModal">
+        <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
+            <div style="font-size:20px; color:var(--text-sub); cursor:pointer; padding:5px;" onclick="closeModal()">✕</div>
+        </div>
+        <div id="modalContent"></div>
+    </div>
+
     <script>
+        // ========================================================
+        // 模块 1：全局变量与基础工具
+        // ========================================================
         const timelineContainer = document.getElementById('timelineContainer');
         const messageInput = document.getElementById('messageInput');
         const imageInput = document.getElementById('imageInput');
@@ -103,7 +127,6 @@
         const inputPanel = document.getElementById('inputPanel');
         let currentBase64Image = null;
 
-        // 显示报错黑框
         window.onerror = function(message, source, lineno, colno, error) {
             const panel = document.getElementById('debug-panel');
             panel.style.display = 'block';
@@ -118,6 +141,9 @@
             setTimeout(() => { toast.remove(); }, 2000);
         }
 
+        // ========================================================
+        // 模块 2：渲染时间流
+        // ========================================================
         function renderTimeline() {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
             const groupedByDay = {};
@@ -159,6 +185,9 @@
         }
         window.onload = renderTimeline;
 
+        // ========================================================
+        // 模块 3：输入面板与图片处理
+        // ========================================================
         function openInputPanel() { inputOverlay.classList.add('show'); inputPanel.classList.add('show'); }
         function closeInputPanel() { inputOverlay.classList.remove('show'); inputPanel.classList.remove('show'); messageInput.value = ''; currentBase64Image = null; }
 
@@ -180,6 +209,9 @@
             reader.readAsDataURL(file);
         });
 
+        // ========================================================
+        // 模块 4：保存记录（带全局报错拦截）
+        // ========================================================
         async function saveRecord() {
             const text = messageInput.value.trim();
             if (!text && !currentBase64Image) return showToast("写点什么吧～");
@@ -193,7 +225,7 @@
             let arr = [];
             if (t) arr.push({ type: "text", text: t });
             if (i) arr.push({ type: "image_url", image_url: { url: i } });
-            if (i && !t) arr.unshift({ type: "text", text: "请看看这张图片。" });
+            if (i && !t) arr.unshift({ type: "text", text: "请看看这张图片，感受一下意境。" });
 
             try {
                 const res = await fetch("/api/chat", {
@@ -223,23 +255,33 @@
             }
         }
 
+        // ========================================================
+        // 模块 5：存储与导出
+        // ========================================================
         function saveToHistory(type, role, content) {
             const h = JSON.parse(localStorage.getItem('shijian_history') || '[]');
             h.push({ type, role, content, time: new Date().toISOString() });
             localStorage.setItem('shijian_history', JSON.stringify(h));
         }
 
+        function exportData() { alert("导出功能已保留"); }
+
+        // ========================================================
+        // 模块 6：详情页弹窗
+        // ========================================================
         function openModal(dateStr, dayData) {
             const ai = dayData.find(x => x.role === 'ai');
             const img = dayData.find(x => x.type === 'image');
-            let html = `<div style="background:#FFF; padding:20px; border-radius:10px;"><p>${ai ? ai.content : '无记录'}</p>`;
-            if (img) html += `<img src="${img.content}" style="width:100%; border-radius:6px; margin-top:10px;">`;
-            html += `</div>`;
+            let html = `<div class="detail-card">
+                            <div class="detail-date">${dateStr}</div>
+                            <h2 class="detail-title">${ai ? ai.content.split('\n')[0].substring(0,15) : '今日留白'}</h2>`;
+            if (img) html += `<img src="${img.content}" class="detail-image">`;
+            html += `<p class="detail-text">${ai ? ai.content : '这一天没有文字记录。'}</p></div>`;
+            
             document.getElementById('modalContent').innerHTML = html;
             document.getElementById('detailModal').classList.add('show');
         }
         function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
-        function exportData() { alert("导出功能已保留"); }
     </script>
 </body>
 </html>
