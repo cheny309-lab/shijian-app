@@ -119,9 +119,9 @@
         <div id="modalContent"></div>
     </div>
 
-    <script>
+       <script>
         // ========================================================
-        // JS 模块 1：全局变量与基础工具
+        // 模块 1：全局变量与基础工具
         // ========================================================
         const timelineContainer = document.getElementById('timelineContainer');
         const messageInput = document.getElementById('messageInput');
@@ -129,12 +129,6 @@
         const inputOverlay = document.getElementById('inputOverlay');
         const inputPanel = document.getElementById('inputPanel');
         let currentBase64Image = null;
-
-        window.onerror = function(message, source, lineno, colno, error) {
-            const panel = document.getElementById('debug-panel');
-            panel.style.display = 'block';
-            panel.innerText += `\n⚠️ JS错误: ${message} (第${lineno}行)`;
-        };
 
         function showToast(msg) {
             const toast = document.createElement('div');
@@ -145,7 +139,7 @@
         }
 
         // ========================================================
-        // JS 模块 2：渲染时间流
+        // 模块 2：渲染时间流
         // ========================================================
         function renderTimeline() {
             const history = JSON.parse(localStorage.getItem('shijian_history') || '[]');
@@ -189,10 +183,19 @@
         window.onload = renderTimeline;
 
         // ========================================================
-        // JS 模块 3：输入面板与图片压缩
+        // 模块 3：输入面板控制
         // ========================================================
-        function openInputPanel() { inputOverlay.classList.add('show'); inputPanel.classList.add('show'); }
-        function closeInputPanel() { inputOverlay.classList.remove('show'); inputPanel.classList.remove('show'); messageInput.value = ''; currentBase64Image = null; }
+        function openInputPanel() { 
+            inputOverlay.classList.add('show'); 
+            inputPanel.classList.add('show'); 
+        }
+        
+        function closeInputPanel() { 
+            inputOverlay.classList.remove('show'); 
+            inputPanel.classList.remove('show'); 
+            messageInput.value = ''; 
+            currentBase64Image = null; 
+        }
 
         imageInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
@@ -213,18 +216,30 @@
         });
 
         // ========================================================
-        // JS 模块 4：保存记录与请求（带网络重试提示）
+        // 模块 4：保存记录与发送请求
         // ========================================================
         async function saveRecord() {
             const text = messageInput.value.trim();
-            if (!text && !currentBase64Image) return showToast("写点什么吧～");
+            
+            // 没有文字也没有图片，提示用户
+            if (!text && !currentBase64Image) {
+                showToast("写点什么吧～");
+                return;
+            }
 
-            const t = text, i = currentBase64Image;
+            // 暂存数据并关闭面板
+            const t = text;
+            const i = currentBase64Image;
             closeInputPanel();
+            
+            // 立即存入本地（保证时间轴有显示）
             if (t) saveToHistory('text', 'user', t);
             if (i) saveToHistory('image', 'user', i);
-            
+            renderTimeline(); // 先刷新一次界面让用户看到
+
             showToast("拾间正在感受...");
+
+            // 组装发给后端的数组
             let arr = [];
             if (t) arr.push({ type: "text", text: t });
             if (i) arr.push({ type: "image_url", image_url: { url: i } });
@@ -245,18 +260,17 @@
                 const data = await res.json();
                 if (data.choices) {
                     saveToHistory('text', 'ai', data.choices[0].message.content); 
-                    renderTimeline();
+                    renderTimeline(); // 拿到AI回复后，再次刷新界面
                 } else {
                     showToast("拾间走神了，再试一次～");
                 }
             } catch (e) {
-                // 针对断网/超时的友好提示
                 showToast("网络开小差了，请再点一次保存");
             }
         }
 
         // ========================================================
-        // JS 模块 5：存储与导出
+        // 模块 5：存储与导出
         // ========================================================
         function saveToHistory(type, role, content) {
             const h = JSON.parse(localStorage.getItem('shijian_history') || '[]');
@@ -267,7 +281,7 @@
         function exportData() { alert("导出功能已保留"); }
 
         // ========================================================
-        // JS 模块 6：详情弹窗控制
+        // 模块 6：详情弹窗
         // ========================================================
         function openModal(dateStr, dayData) {
             const ai = dayData.find(x => x.role === 'ai');
