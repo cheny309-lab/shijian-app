@@ -196,6 +196,11 @@
                     card.append(node('p', 'record-status', record.error || '原始记录已保留，文字暂未整理。'));
                     card.append(button('重试AI整理', event => { event.stopPropagation(); void runJournal(record.id); }, 'retry-btn'));
                 }
+                const billJobs = S.imports.filter(job => (record.sourceIds || []).includes(job.id));
+                if (billJobs.some(job => job.status === 'failed')) {
+                    card.append(node('p', 'record-status', '图片与日记已保留 · 账单识别尚未完成'));
+                    card.append(button('查看账单识别问题', event => { event.stopPropagation(); S.page = 'bills'; render(); }, 'retry-btn'));
+                } else if (billJobs.some(job => job.status === 'running')) card.append(node('p', 'record-status', '正在单独识别账单…'));
                 card.addEventListener('click', () => openRecord(record.id)); card.addEventListener('keydown', e => { if (e.key === 'Enter') openRecord(record.id); }); content.append(card);
             }
             group.append(date, track, content); root.append(group);
@@ -358,6 +363,7 @@
         const running = S.imports.filter(i => ['running', 'failed'].includes(i.status));
         const notes = S.imports.filter(i => i.status === 'done' && ((i.warnings || []).length || (i.totals || []).some(t => t.scope === 'period')));
         if (running.length || notes.length) {
+            tasksPanel.open = running.some(job => job.status === 'failed');
             tasksPanel.append(node('summary', '', running.length ? `资料整理 · ${running.length} 份处理中或待重试` : '来源汇总与识别说明'));
             running.forEach(job => {
                 const item = node('div', 'task-item'); item.append(node('p', 'muted', job.status === 'running' ? '正在整理一份资料…' : job.error));

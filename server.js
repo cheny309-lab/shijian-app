@@ -5,10 +5,10 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
-const { extractBills, makeReflections } = require('./modules/billing-ai');
+const { extractBills, makeReflections, providerDiagnosis } = require('./modules/billing-ai');
 
 // 模块 1：运行配置。密钥只从 Render 环境变量读取，不写进网页。
-const VERSION = '2026.10.26-bills-v0.1';
+const VERSION = '2026.10.26-bills-v0.1.1';
 function readConfig(env = process.env) {
   const seconds = Number(env.AI_TIMEOUT_SECONDS || 25);
   return {
@@ -16,6 +16,7 @@ function readConfig(env = process.env) {
     // 保留原模型默认值，避免在修复时擅自切换账户计费模型。
     model: (env.ZHIPU_MODEL || 'glm-4v').trim(),
     imageModel: (env.ZHIPU_IMAGE_MODEL || env.ZHIPU_MODEL || 'glm-4v').trim(),
+    billModel: (env.ZHIPU_BILL_MODEL || '').trim(),
     endpoint: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',
     timeout: Math.min(55, Math.max(1, Number.isFinite(seconds) ? seconds : 25)) * 1000
   };
@@ -101,7 +102,7 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
   app.get('/shijian.html', sendPage);
   const health = (req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ ok: true, version: VERSION, aiConfigured: Boolean(config.apiKey), model: config.model, imageModel: config.imageModel });
+    res.json({ ok: true, version: VERSION, aiConfigured: Boolean(config.apiKey), model: config.model, imageModel: config.imageModel, billModel: config.billModel || config.imageModel });
   };
   app.get('/health', health);
   app.get('/api/health', health);
@@ -158,7 +159,7 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
   // 账单与生活回看独立路由；任一失败不改变浏览器中已经保存的原始记录。
   const structuredRoute = operation => async (req, res) => {
     res.set('Cache-Control', 'no-store');
-    const fail = (status, code, message) => res.status(status).json({ error: { code, message, requestId: req.requestId } });
+    const fail = (status, code, message, details = {}) => res.status(status).json({ error: { code, message, requestId: req.requestId, ...details } });
     if (!config.apiKey) return fail(503, 'AI_KEY_MISSING', 'AI密钥尚未配置，请在 Render 设置 ZHIPU_API_KEY。');
     const controller = new AbortController();
     const onClose = () => { if (!res.writableEnded) controller.abort(); };
@@ -168,10 +169,17 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
       if (!res.destroyed) res.json({ ...result, requestId: req.requestId });
     } catch (error) {
       if (res.destroyed || controller.signal.aborted) return;
+      const details = providerDiagnosis(error);
       const info = error.code === 'INVALID_INPUT' ? { status: 400, code: error.code, message: error.message }
-        : error.code === 'AI_INVALID_JSON' ? { status: 502, code: error.code, message: error.message } : providerError(error);
-      logger.error('[shijian:structured]', { requestId: req.requestId, code: info.code, upstreamStatus: error.response && error.response.status });
-      fail(info.status, info.code, info.message);
+        : ['AI_INVALID_JSON', 'AI_OUTPUT_LIMIT'].includes(error.code) ? { status: 502, code: error.code, message: error.message } : providerError(error);
+      if (info.code === 'AI_CONFIGURATION') {
+        if (details.upstreamCode === '1211') info.message = '账单模型不可用，请核对模型名称及账户权限；日记与账单可配置不同模型。';
+        else if (details.parameter === 'max_tokens') info.message = '当前账单模型拒绝了输出长度参数。请分段截图，或配置支持较长输出的独立账单模型。';
+        else if (details.parameter === 'image_url') info.message = '当前账单模型不接受这类图片输入，请配置支持Base64图片的账单模型。';
+        else if (details.parameter) info.message = '账单请求的 ' + details.parameter + ' 参数不被当前模型接受，原始资料仍保留。';
+      }
+      logger.error('[shijian:structured]', { requestId: req.requestId, code: info.code, upstreamStatus: error.response && error.response.status, ...details });
+      fail(info.status, info.code, info.message, details);
     } finally { res.removeListener('close', onClose); }
   };
   app.post('/api/bills/extract', structuredRoute(async (body, signal) => {

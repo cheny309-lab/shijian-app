@@ -5,7 +5,7 @@
     else root.LedgerCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     'use strict';
-    const VERSION = '2026.10.26-bills-v0.1';
+    const VERSION = '2026.10.26-bills-v0.1.1';
     const CATEGORIES = ['餐饮', '出行', '居家', '购物', '健康', '学习', '休闲', '其他'];
     const DIGITS = { CNY: 2, USD: 2, HKD: 2, EUR: 2, GBP: 2, SGD: 2, AUD: 2, CAD: 2, JPY: 0, TWD: 2, KRW: 0 };
     const clean = (value, max = 200) => typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -55,8 +55,15 @@
         if (occurred) {
             const ds = evidence.date.replace(/年|\//g, '-').replace(/月/g, '-').replace(/日/g, '');
             const dm = /(\d{4})-(\d{1,2})-(\d{1,2})/.exec(ds);
-            const evidenceDay = dm && `${dm[1]}-${dm[2].padStart(2, '0')}-${dm[3].padStart(2, '0')}`;
-            if (evidenceDay !== occurred.day || (occurred.precision === 'time' && !evidence.date.includes(occurred.value.slice(11, 16)))) reasons.push('日期与来源摘录不一致或不完整');
+            let evidenceDay = dm && `${dm[1]}-${dm[2].padStart(2, '0')}-${dm[3].padStart(2, '0')}`;
+            // 微信等月度流水把年份放在页头，行内只显示月日；仅组合明确且同月的两段来源。
+            if (!evidenceDay) {
+                const ym = /(\d{4})年(\d{1,2})月/.exec(evidence.date);
+                const md = /(?:^|[；;\s])(\d{1,2})月(\d{1,2})日/.exec(evidence.date);
+                if (ym && md && +ym[2] === +md[1]) evidenceDay = `${ym[1]}-${md[1].padStart(2, '0')}-${md[2].padStart(2, '0')}`;
+            }
+            const times = [...evidence.date.matchAll(/(\d{1,2}):(\d{2})/g)].map(m => m[1].padStart(2, '0') + ':' + m[2]);
+            if (evidenceDay !== occurred.day || (occurred.precision === 'time' && !times.includes(occurred.value.slice(11, 16)))) reasons.push('日期与来源摘录不一致或不完整');
         }
         if (!['amount', 'date', 'direction', 'paymentState'].every(field => verified[field] === true)) reasons.push('AI复核尚未通过关键字段');
         return {
