@@ -5,9 +5,10 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
+const { extractBills, makeReflections } = require('./modules/billing-ai');
 
 // 模块 1：运行配置。密钥只从 Render 环境变量读取，不写进网页。
-const VERSION = '2026.10.25-fix1';
+const VERSION = '2026.10.26-bills-v0.1';
 function readConfig(env = process.env) {
   const seconds = Number(env.AI_TIMEOUT_SECONDS || 25);
   return {
@@ -106,7 +107,7 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
   app.get('/api/health', health);
 
   // 仅开放常用图标及 assets，不将服务器源码和整个仓库作为静态目录公开。
-  app.use('/assets', express.static(path.join(rootDir, 'assets'), { dotfiles: 'deny' }));
+  app.use('/assets', express.static(path.join(rootDir, 'assets'), { dotfiles: 'deny', setHeaders: res => res.set('Cache-Control', 'no-store') }));
   for (const name of ['favicon.ico', 'icon.png', 'favicon.png', 'apple-touch-icon.png', 'manifest.json', 'manifest.webmanifest']) {
     app.get('/' + name, (req, res) => {
       const file = path.join(rootDir, name);
@@ -154,6 +155,42 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
     }
   });
 
+  // 账单与生活回看独立路由；任一失败不改变浏览器中已经保存的原始记录。
+  const structuredRoute = operation => async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    const fail = (status, code, message) => res.status(status).json({ error: { code, message, requestId: req.requestId } });
+    if (!config.apiKey) return fail(503, 'AI_KEY_MISSING', 'AI密钥尚未配置，请在 Render 设置 ZHIPU_API_KEY。');
+    const controller = new AbortController();
+    const onClose = () => { if (!res.writableEnded) controller.abort(); };
+    res.on('close', onClose);
+    try {
+      const result = await operation(req.body, controller.signal);
+      if (!res.destroyed) res.json({ ...result, requestId: req.requestId });
+    } catch (error) {
+      if (res.destroyed || controller.signal.aborted) return;
+      const info = error.code === 'INVALID_INPUT' ? { status: 400, code: error.code, message: error.message }
+        : error.code === 'AI_INVALID_JSON' ? { status: 502, code: error.code, message: error.message } : providerError(error);
+      logger.error('[shijian:structured]', { requestId: req.requestId, code: info.code, upstreamStatus: error.response && error.response.status });
+      fail(info.status, info.code, info.message);
+    } finally { res.removeListener('close', onClose); }
+  };
+  app.post('/api/bills/extract', structuredRoute(async (body, signal) => {
+    let message;
+    try { message = normalizeMessage(body); }
+    catch (error) { error.code = 'INVALID_INPUT'; throw error; }
+    return extractBills({ client: httpClient, config, message, extractContent, signal });
+  }));
+  app.post('/api/reflections', structuredRoute(async (body, signal) => {
+    const periods = body && body.periods;
+    if (!Array.isArray(periods) || !periods.length || periods.length > 6 || JSON.stringify(periods).length > 24000 || periods.some(p =>
+      !p || !/^\d{4}-\d{2}(?:-\d{2})?$/.test(p.id) || !Number.isInteger(p.count) || p.count < 0 || !Array.isArray(p.totals) || !Array.isArray(p.merchants) || !Array.isArray(p.notes)
+    ) || new Set(periods.map(p => p.id)).size !== periods.length) {
+      const error = new Error('回看资料格式不正确。'); error.code = 'INVALID_INPUT'; throw error;
+    }
+    const items = await makeReflections({ client: httpClient, config, periods, extractContent, signal });
+    return { items };
+  }));
+
   app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
     const tooLarge = error.type === 'entity.too.large';
@@ -167,6 +204,13 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
 
 // 模块 5：Render 启动入口。使用文件所在目录，与启动工作目录无关。
 if (require.main === module) {
+  const required = ['shijian.html', 'assets/ledger-core.js', 'assets/storage.js', 'assets/app.js', 'assets/app.css'];
+  for (const file of required) {
+    if (!fs.existsSync(path.join(__dirname, file))) {
+      console.error('部署缺少文件：' + file + '。请将账单开发包按原文件夹结构完整上传。');
+      process.exit(1);
+    }
+  }
   const config = readConfig();
   const app = createApp({ config });
   const port = Number(process.env.PORT) || 10000;
