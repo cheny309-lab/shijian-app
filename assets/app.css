@@ -97,3 +97,12 @@ select,input { font-size:16px; padding:10px 12px; border:1px solid #e1e1d9; bord
 .detail-card .content-title,.content-title { overflow-wrap:anywhere; }
 /* 「我的」沿用安静的分组与真实状态，不以会员、排名或红点引导。 */
 .mine-hero{display:flex;gap:12px;align-items:center;margin:20px 0 8px}.sage-dot{display:inline-block;width:15px;height:15px;border-radius:50%;background:#819982;flex-shrink:0}.nickname{font:inherit;font-size:23px;border:0;background:transparent;color:#3e493b;padding:8px 0;text-align:left;overflow-wrap:anywhere}.mine-counts{font-size:15px;line-height:1.9;color:#68715f}.local-state{padding:18px;background:#eef0e7;border-radius:14px;margin:20px 0}.local-state strong{font-size:14px;font-weight:500}.local-state summary{font-size:14px;color:#526651;cursor:pointer}.mine-section{margin:28px 0}.mine-section h3{font-size:15px;font-weight:500;color:#78806f;margin-bottom:10px}.mine-link{display:block;width:100%;padding:14px 0;background:none;border:0;border-bottom:1px solid #e3e5dc;color:#3f513c;text-align:left;font:inherit;font-size:15px}.setting-row{display:flex;justify-content:space-between;gap:15px;align-items:center;padding:14px 0;font-size:15px}.setting-row input{width:20px;height:20px;accent-color:#819982}.feedback-images img,.feedback-preview{max-width:100%;max-height:240px;object-fit:contain;border-radius:8px}.draft-list-row{padding:14px 0;border-bottom:1px solid #e5e6de}#minePage .muted,.detail-card .muted{font-size:14px;color:#6d7567}.detail-card input,.detail-card select{max-width:100%}.detail-card input[type=file]{width:100%;font-size:14px}.detail-card a{color:#526651}
+
+/* 桌面窗口与短句预览：不改变原页面结构。 */
+.desktop-icon { display:block; width:80px; height:80px; border-radius:18px; margin:0 auto 16px; }
+#quickBillPreview { background:#edf0e7; color:#455344; padding:10px 12px; border-radius:12px; margin:0 0 10px; }
+#quickBillPreview p { margin:4px 0; line-height:1.65; overflow-wrap:anywhere; }
+#quickBillPreview .muted { font-size:12px; }
+@media (display-mode:standalone) { .header { padding-top:calc(20px + env(safe-area-inset-top)); } }
+
+.mine-slogan { color:#7d8b79; font-size:13px; letter-spacing:.04em; margin:-4px 0 18px; line-height:1.8; }

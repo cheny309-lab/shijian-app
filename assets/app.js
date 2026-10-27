@@ -1,7 +1,7 @@
 /* 拾间应用层：输入、生活记录、账单视图分别组织；金额与去重交给 LedgerCore。 */
 (function () {
     'use strict';
-    const C = window.LedgerCore, DB = window.ShijianStorage, J = window.JournalCore;
+    const C = window.LedgerCore, DB = window.ShijianStorage, J = window.JournalCore, Quick = window.ShijianQuickBill;
     const S = { records: [], sources: [], transactions: [], imports: [], reflections: [], meta: [], drafts: [], ready: false, saving: false, imageLoading: false,
         page: 'timeline', month: C.dayKey().slice(0, 7), currency: 'CNY', filter: 'all', category: '', book: 'all', batchMode: false, selected: new Set(), hideAmounts: false, autoAI: true };
     const $ = id => document.getElementById(id);
@@ -13,6 +13,7 @@
     const Drafts = window.ShijianDrafts.create({DB,node,button,ready:()=>S.ready,composerValue:()=>({text:$('messageInput').value,images:S.drafts,intent:$('recordIntent').value,bookId:$('uploadBook').value,useAI:$('useAI').checked}),setComposer:draft=>{$('messageInput').value=draft.text||'';S.drafts=draft.images||[];$('recordIntent').value=draft.intent||'auto';$('uploadBook').value=books().some(b=>b.id===draft.bookId)?draft.bookId:'daily';$('useAI').checked=!!draft.useAI;renderDrafts();}});
     const Journals = window.ShijianJournals.create({ S, C, J, DB, node, button, field, input, modal, closeModal, refresh, report, toast, id, openRecord, showSource, runJournal, scheduleReflections, render, Drafts });
     const Mine = window.ShijianMine.create({S,C,J,DB,node,button,modal,closeModal,toast,report,refresh,download,books,exportCSV,Journals,Drafts,openRecord,resumeComposer:async targetId=>{await openInputPanel(targetId);},getErrorCode:()=>S.lastErrorCode||'',preferencesChanged:()=>{$('useAI').checked=S.autoAI;scheduleReflections();}});
+    let quickKey='',quickConfirmed=false;
     let lastModalFocus;
     let toastTimer, reflectionTimer, reflectionRunning = false;
     const runningJournal = new Set(), runningBills = new Set();
@@ -131,6 +132,7 @@
         $('saveButton').textContent = S.saving ? '保存中…' : S.resuming ? '接回草稿中…' : S.imageLoading ? '图片处理中…' : '保存';
     }
     function renderDrafts() {
+        previewQuickBill();
         const root = $('draftImages'); root.replaceChildren();
         S.drafts.forEach((draft, index) => {
             const box = node('div', 'draft-thumb'); const img = node('img'); img.src = draft.preview; img.alt = '待保存图片 ' + (index + 1);
@@ -157,19 +159,29 @@
         $('inputPanel').classList.add('show'); $('inputOverlay').classList.add('show');
         $('inputPanel').setAttribute('aria-hidden', 'false'); document.body.classList.add('panel-open');
         S.resuming=true;const controls=[$('messageInput'),$('imageInput'),$('recordIntent'),$('uploadBook'),$('useAI')];controls.forEach(e=>e.disabled=true);updateSaveButton();
-        try{await Drafts.resumeComposer(typeof targetId==='string'?targetId:undefined);}catch(error){report(error);}finally{S.resuming=false;controls.forEach(e=>e.disabled=false);updateSaveButton();}
+        try{await Drafts.resumeComposer(typeof targetId==='string'?targetId:undefined);}catch(error){report(error);}finally{S.resuming=false;controls.forEach(e=>e.disabled=false);updateSaveButton();previewQuickBill();}
     }
     function closeInputPanel() {
         if (S.saving) return;
         $('inputPanel').classList.remove('show'); $('inputOverlay').classList.remove('show');
         $('inputPanel').setAttribute('aria-hidden', 'true'); document.body.classList.remove('panel-open'); $('messageInput').blur(); void Drafts.saveComposer();
     }
+    function quickProposal(){return !S.drafts.length&&$('recordIntent').value!=='journal'?Quick.parse($('messageInput').value):null;}
+    function previewQuickBill(){
+        const p=quickProposal(),root=$('quickBillPreview');root.replaceChildren();root.hidden=!p;
+        const key=p?JSON.stringify(p):'';if(key!==quickKey){quickKey=key;quickConfirmed=false;}
+        if(!p)return;
+        root.append(node('p','',`将记下：${p.occurredAt} · ${p.merchant} · ${amount(p.amountMinor,p.currency)}${p.paymentMethod?' · '+p.paymentMethod:''}`),node('p','muted',`只入账本 · ${p.category}（可修改） · 原话留在本机${p.dateDefaulted?' · 未写日期按今天记录':''}。本次入账在本机完成；${$('useAI').checked?'已允许AI日月回看使用这笔信息':'未允许这笔信息参与AI回看'}。`));
+        if(p.needsConfirmation){const check=node('input');check.type='checkbox';check.checked=quickConfirmed;check.id='quickBillConfirm';const label=node('label','check-label');label.append(check,node('span','','确认这是一笔人民币消费'));check.addEventListener('change',()=>{quickConfirmed=check.checked;});root.append(label);}
+    }
     async function saveRecord() {
         if (!S.ready || S.saving || S.imageLoading || S.resuming) return;
         const text = $('messageInput').value.trim();
         if (!text && !S.drafts.length) { toast('一句话，或一张图片，都可以。'); return; }
+        const quick=quickProposal();
+        if(quick?.needsConfirmation&&!quickConfirmed){toast('请确认这是一笔人民币消费，再保存。');$('quickBillConfirm')?.focus();return;}
         S.saving = true; updateSaveButton(); await Drafts.pause();
-        const now = new Date().toISOString(), batchId = id(), useAI = $('useAI').checked, intent = $('recordIntent').value === 'auto' && /^(?:请)?(?:只记账|仅记账|仅入账)/.test(text) ? 'bill' : $('recordIntent').value, bookId = $('uploadBook').value || 'daily';
+        const now = new Date().toISOString(), batchId = id(), useAI = !quick && $('useAI').checked, intent = quick ? 'bill' : $('recordIntent').value === 'auto' && /^(?:请)?(?:只记账|仅记账|仅入账)/.test(text) ? 'bill' : $('recordIntent').value, bookId = $('uploadBook').value || 'daily';
         const records = [], sources = [];
         try {
             const drafts = S.drafts.length ? S.drafts : [null];
@@ -177,14 +189,15 @@
                 const draft = drafts[i], recordId = id(), sourceId = draft ? draft.id : 'text-' + recordId;
                 const record = { id: recordId, batchId, time: now, text: i === 0 ? text : '', image: draft ? draft.preview : null,
                     sourceIds: [sourceId], ai: '', aiStatus: 'idle', error: '', aiAllowed: useAI, routingVersion: 1, intent, bookId,
-                    hasNarrative: i === 0 && !!text && !/^(?:请|帮我|这张|这是|上传|识别|一份|一张|份|的|流水|消费|明细|本月|本周|账单|截图|记账|只记账|仅记账|微信|支付宝|银行|支付|单笔|月度|汇总|支出|记录|[0-9一二三四五六七八九十零年月日，。！、：:\s/-])+$/u.test(text),
+                    hasNarrative: !quick && i === 0 && !!text && !/^(?:请|帮我|这张|这是|上传|识别|一份|一张|份|的|流水|消费|明细|本月|本周|账单|截图|记账|只记账|仅记账|微信|支付宝|银行|支付|单笔|月度|汇总|支出|记录|[0-9一二三四五六七八九十零年月日，。！、：:\s/-])+$/u.test(text),
                     placement: intent === 'bill' ? 'bills' : intent === 'journal' || !draft ? 'journal' : 'pending' };
                 records.push(record);
                 sources.push({ ...(draft || {}), id: sourceId, recordIds: [recordId], text: record.text, uploadedAt: now, batchId, bookId, kind: draft ? 'image' : 'text' });
             }
-            await DB.saveBatch(records, sources, Drafts.getComposerId());
+            if(quick){records[0].receipt=true;records[0].entryMethod='text';records[0].aiAllowed=$('useAI').checked;sources[0].entryMethod='text';}
+            const savedQuick=await DB.saveBatch(records, sources, Drafts.getComposerId(),quick?{...Quick.transaction(quick,sources[0].id,bookId),aiAllowed:$('useAI').checked}:undefined);
             $('messageInput').value = ''; S.drafts = []; renderDrafts();
-            S.saving = false; closeInputPanel(); await refresh(); toast(useAI ? '已保存在此设备，正在轻轻整理。' : '已保存在此设备，未发送给AI。');
+            S.saving = false; closeInputPanel(); previewQuickBill(); await refresh(); toast(quick ? savedQuick?.status==='review'?'已留下，可能与已有账单重复，请在账单里核对。':'已记下 · '+quick.merchant+' '+amount(quick.amountMinor,quick.currency)+(quick.paymentMethod?' · '+quick.paymentMethod:'')+'，可在账单修改或移除。' : useAI ? '已保存在此设备，正在轻轻整理。' : '已保存在此设备，未发送给AI。');
             if (useAI) {
                 if (intent === 'auto') for (const record of records) if (record.image && !record.hasNarrative) (record.sourceIds || []).forEach(Journals.markOffer);
                 records.filter(C.onTimeline).forEach(record => { void runJournal(record.id); });
@@ -509,7 +522,7 @@
     function openTransaction(transactionId) {
         const t = S.transactions.find(t => t.id === transactionId); if (!t) return;
         const root = modal(t.status === 'confirmed' ? '这一笔' : '一起核对这一笔');
-        root.append(node('p', 'muted', t.confirmation === 'user' ? '已由你确认／修改' : t.status === 'confirmed' ? '通过自动校验 · 随时可以修改' : '原始资料已保留，尚未计入累计。'));
+        root.append(node('p', 'muted', t.entryMethod==='text'?'来源：手动记录 · 原话可查；未经支付平台验证'+(t.paymentMethod?' · '+t.paymentMethod:''):t.confirmation === 'user' ? '已由你确认／修改' : t.status === 'confirmed' ? '通过自动校验 · 随时可以修改' : '原始资料已保留，尚未计入累计。'));
         root.append(button(t.deleted ? '恢复为待核对记录' : '从账本移除，保留原始资料', async () => {
             try {
                 await DB.changeLedger(state => { const latest = state.transactions.find(x => x.id === t.id); return { transactions: [C.edit(latest, t.deleted ? { deleted: false, status: 'review', reasons: ['已恢复，请重新核对'] } : { deleted: true }, t.deleted ? '用户恢复' : '用户移除')] }; });
@@ -537,6 +550,7 @@
         const form = node('form', 'bill-form'); form.addEventListener('submit', e => e.preventDefault());
         const merchant = input(t.merchant, '商户初始识别结果（保留）', form); merchant.readOnly = true;
         const displayName = input(C.merchantLabel(t), '列表简称 · 不改变来源原名', form); displayName.maxLength = 100;
+        const paymentMethod=selectField(t.paymentMethod||'', [['','未注明'],['现金','现金'],['微信','微信'],['支付宝','支付宝']], '支付方式', form);
         const date = input(t.occurredAt, '交易发生时间', form); date.placeholder = '2026-10-25 或 2026-10-25 12:30';
         const currency = selectField(t.currency in C.DIGITS ? t.currency : '', [['', '请选择币种'], ...Object.keys(C.DIGITS).map(c => [c, c])], '币种', form);
         const value = input(t.amountMinor !== null && t.currency in C.DIGITS ? C.decimal(t.amountMinor, t.currency) : t.proposedAmount, '金额（非负）', form); value.inputMode = 'decimal';
@@ -557,7 +571,7 @@
                 const amountMinor = C.money(value.value, currency.value), occurred = C.date(date.value);
                 if (confirm && (amountMinor === null || !occurred || occurred.timestamp > Date.now() + 300000 || direction.value === 'unknown' || paid.value !== 'paid')) throw Error('请核对金额、币种、完整日期、收支方向，并确认交易已经完成。');
                 if (confirm && duplicate && !separate.checked) throw Error('请先判断是否与已有交易为同一笔。');
-                const changes = { merchant: t.merchant, displayName: displayName.value.trim().slice(0, 100), correctedMerchant: merchant.value.trim().slice(0, 100), subcategory: subcategory.value.trim().slice(0, 30), bookId: book.value, bookManuallySet: !!t.bookManuallySet || book.value !== C.bookOf(t), occurredAt: occurred ? occurred.value : date.value.trim(), precision: occurred ? occurred.precision : 'unknown',
+                const changes = { paymentMethod:paymentMethod.value,merchant: t.merchant, displayName: displayName.value.trim().slice(0, 100), correctedMerchant: merchant.value.trim().slice(0, 100), subcategory: subcategory.value.trim().slice(0, 30), bookId: book.value, bookManuallySet: !!t.bookManuallySet || book.value !== C.bookOf(t), occurredAt: occurred ? occurred.value : date.value.trim(), precision: occurred ? occurred.precision : 'unknown',
                     amountMinor, proposedAmount: value.value, currency: currency.value, direction: direction.value, paymentState: paid.value, category: category.value,
                     categoryTentative: false, tags: [...new Set(tags.value.split(/[、,，]/).map(s => s.trim().slice(0, 20)).filter(Boolean))].slice(0, 5),
                     status: confirm ? 'confirmed' : 'review', confirmation: confirm ? 'user' : '', reasons: confirm ? [] : ['已保存修改，等待确认'], deleted: false };
@@ -641,7 +655,7 @@
         try {
             const rows = C.inBook(await DB.getAll('transactions'), options.book || 'all').filter(t => (!t.deleted||options.includeDeleted) && (!options.month || (t.occurredAt || '').startsWith(options.month)));
             const cell = value => '"' + String(value == null ? '' : value).replace(/^(?:\s*[=+\-@]|[\t\r])/, s => "'" + s).replace(/"/g, '""') + '"';
-            const table = [['编号', '发生时间', '来源商户', '展示简称', '细分用途', '账本', '方向', '金额', '币种', '类别', '标签', '状态', '已移除', '来源编号'], ...rows.map(t => [t.id, t.occurredAt, t.merchant, C.merchantLabel(t), t.subcategory || '', bookName(t.bookId), t.direction, t.amountMinor === null || !(t.currency in C.DIGITS) ? t.proposedAmount : C.decimal(t.amountMinor, t.currency), t.currency, t.category, t.tags.join('、'), t.status, t.deleted ? '是' : '否', t.sourceIds.join(';')])];
+            const table = [['编号', '发生时间', '来源商户', '展示简称', '细分用途', '账本', '方向', '金额', '币种', '类别', '标签', '状态', '已移除', '来源编号', '支付方式', '录入方式'], ...rows.map(t => [t.id, t.occurredAt, t.merchant, C.merchantLabel(t), t.subcategory || '', bookName(t.bookId), t.direction, t.amountMinor === null || !(t.currency in C.DIGITS) ? t.proposedAmount : C.decimal(t.amountMinor, t.currency), t.currency, t.category, t.tags.join('、'), t.status, t.deleted ? '是' : '否', t.sourceIds.join(';'),t.paymentMethod||'',t.entryMethod==='text'?'手动短句':'资料识别'])];
             download(new Blob(['\ufeff' + table.map(row => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }), 'shijian-bills-' + C.dayKey() + '.csv');
         } catch (error) { report(error); }
     }
@@ -662,6 +676,9 @@
     async function init() {
         $('currentMonth').textContent = new Date().getFullYear() + '年' + (new Date().getMonth() + 1) + '月';
         $('messageInput').addEventListener('input',Drafts.scheduleComposer);
+        $('messageInput').addEventListener('input',previewQuickBill);
+        $('recordIntent').addEventListener('change',previewQuickBill);
+        $('useAI').addEventListener('change',previewQuickBill);
         for(const key of ['recordIntent','uploadBook','useAI'])$(key).addEventListener('change',Drafts.scheduleComposer);
         const draftStatus=node('p','muted');draftStatus.id='inputDraftStatus';$('draftImages').after(draftStatus);
         $('imageInput').addEventListener('change', onImages); $('exportButton').addEventListener('click', exportData);
@@ -681,6 +698,7 @@
             S.ready = true; await refresh(); const task=S.meta.find(m=>m.key==='importTask')?.value;if(task?.state==='reading')notice('上次恢复未完成，请重新选择备份文件。原有记录未作更改。');scheduleReflections();
         } catch (error) { S.lastErrorCode='STORAGE_INIT';notice('此浏览器的保存功能暂时未就绪。请关闭其他拾间页面后刷新，保留已有数据，不要清除网站存储。'); }
         render(); updateSaveButton();
+        if(S.ready&&window.ShijianDesktop.standalone()&&!S.records.length&&!S.transactions.length)notice('这是桌面入口，记录保存在这里。若原来在微信或其他浏览器使用，请到“我的 → 导入恢复”带回备份，原入口先保留。');
         document.addEventListener('visibilitychange', () => { if (!document.hidden && S.ready) void recoverImports().then(refresh).then(scheduleReflections).catch(report); });
         setInterval(() => { if (S.ready) void recoverImports().catch(() => {}); }, 30000);
     }

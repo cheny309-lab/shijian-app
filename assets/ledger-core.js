@@ -5,7 +5,7 @@
     else root.LedgerCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     'use strict';
-    const VERSION = '2026.10.27-mine-v0.3.0';
+    const VERSION = '2026.10.28-desktop-v0.3.1';
     const CATEGORIES = ['餐饮', '出行', '居家', '购物', '健康', '学习', '休闲', '生活服务', '其他'];
     const DIGITS = { CNY: 2, USD: 2, HKD: 2, EUR: 2, GBP: 2, SGD: 2, AUD: 2, CAD: 2, JPY: 0, TWD: 2, KRW: 0 };
     const clean = (value, max = 200) => typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -114,7 +114,9 @@
     function possibleDuplicate(a, b) {
         if (a.amountMinor === null || b.amountMinor === null || a.amountMinor !== b.amountMinor || a.currency !== b.currency || a.direction !== b.direction) return false;
         const da = date(a.occurredAt), db = date(b.occurredAt);
-        if (!da || !db || da.day !== db.day || !key(a.merchant) || key(a.merchant) !== key(b.merchant)) return false;
+        if (!da || !db || da.day !== db.day) return false;
+        if((a.entryMethod==='text'||b.entryMethod==='text')&&a.category===b.category&&a.category!=='其他')return true;
+        if (!key(a.merchant) || key(a.merchant) !== key(b.merchant)) return false;
         return da.precision === 'day' || db.precision === 'day' || Math.abs(da.timestamp - db.timestamp) <= 120000;
     }
     function ingest(existing, candidates) {
@@ -188,7 +190,7 @@
     // 每次仅安排少量历史期间，未完成期间下次打开继续；同一修订失败不自动反复收费。
     function reflectionJobs(transactions, records, reflections, today = dayKey(), limit = 6) {
         const periods = new Map();
-        for (const t of transactions.filter(t => !t.deleted && t.status === 'confirmed' && date(t.occurredAt))) {
+        for (const t of transactions.filter(t => !t.deleted && t.aiAllowed !== false && t.status === 'confirmed' && date(t.occurredAt))) {
             for (const period of [t.occurredAt.slice(0, 10), t.occurredAt.slice(0, 7)]) {
                 if (period.length === 10 ? period >= today : period >= today.slice(0, 7)) continue;
                 if (!periods.has(period)) periods.set(period, []);

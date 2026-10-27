@@ -2,8 +2,16 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>拾间</title>
+    <meta name="theme-color" content="#8DA38E">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="拾间">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/icons/favicon-32.png">
     
     <style>
         /* ========================================================
@@ -92,7 +100,7 @@
         .export-button { font:inherit; font-size:12px; color:#526853; border:1px solid var(--line-color); background:transparent; padding:8px; border-radius:12px; cursor:pointer; }
         .timeline-container { padding-bottom:calc(170px + env(safe-area-inset-bottom)); }
     </style>
-<link rel="stylesheet" href="/assets/app.css?v=20261027m1">
+<link rel="stylesheet" href="/assets/app.css?v=20261028d1">
 </head>
 <body>
 
@@ -124,7 +132,9 @@
     <div class="input-overlay" id="inputOverlay" onclick="closeInputPanel()"></div>
     <div class="input-panel" id="inputPanel" role="dialog" aria-modal="true" aria-label="留下此刻" aria-hidden="true">
         <div class="panel-header"><h3>留下此刻</h3><div class="close-btn" onclick="closeInputPanel()">✕</div></div>
-        <textarea class="textarea-box" id="messageInput" aria-label="记录文字" maxlength="8000" placeholder="今晚加班到很晚，吃了一顿烧烤。"></textarea>
+        <textarea class="textarea-box" id="messageInput" aria-label="记录文字" maxlength="8000" placeholder="写一句生活，也可以记一笔：午饭现金28元。"></textarea>
+        <div id="quickBillPreview" hidden aria-live="polite"></div>
+        <p class="privacy-note">截图适合已有凭证和批量输入，一句话适合简单单笔。拾间提供便利，怎样留下，由你决定。</p>
         <div id="draftImages" class="draft-images"></div>
         <div class="input-options">
             <label>这次留下什么<select id="recordIntent" aria-label="记录用途"><option value="auto">自动判断</option><option value="bill">只记账</option><option value="journal">记生活</option></select></label>
@@ -152,16 +162,18 @@
         <div id="modalContent"></div>
     </div>
 
-<script defer src="/assets/ledger-core.js?v=20261027m1"></script>
-<script defer src="/assets/storage.js?v=20261027m1"></script>
-<script defer src="/assets/backup-core.js?v=20261027m1"></script>
-<script defer src="/assets/drafts-service.js?v=20261027m1"></script>
-<script defer src="/assets/journal-core.js?v=20261027m1"></script>
-<script defer src="/assets/journal-ui.js?v=20261027m1"></script>
-<script defer src="/assets/backup-ui.js?v=20261027m1"></script>
-<script defer src="/assets/feedback-ui.js?v=20261027m1"></script>
-<script defer src="/assets/mine-ui.js?v=20261027m1"></script>
-<script defer src="/assets/app.js?v=20261027m1"></script>
+<script defer src="/assets/ledger-core.js?v=20261028d1"></script>
+<script defer src="/assets/quick-bill.js?v=20261028d1"></script>
+<script defer src="/assets/desktop-ui.js?v=20261028d1"></script>
+<script defer src="/assets/storage.js?v=20261028d1"></script>
+<script defer src="/assets/backup-core.js?v=20261028d1"></script>
+<script defer src="/assets/drafts-service.js?v=20261028d1"></script>
+<script defer src="/assets/journal-core.js?v=20261028d1"></script>
+<script defer src="/assets/journal-ui.js?v=20261028d1"></script>
+<script defer src="/assets/backup-ui.js?v=20261028d1"></script>
+<script defer src="/assets/feedback-ui.js?v=20261028d1"></script>
+<script defer src="/assets/mine-ui.js?v=20261028d1"></script>
+<script defer src="/assets/app.js?v=20261028d1"></script>
 <script>
 window.addEventListener('load', function () {
     if (!window.ShijianApp) {

@@ -108,9 +108,11 @@
         return result;
     }
     // 一个批次的原始记录和原始文件在同一事务中保存，成功前绝不清空输入。
-    function saveBatch(records, sources, draftId) {
+    function saveBatch(records, sources, draftId, quickTransaction) {
         return new Promise((resolve, reject) => {
-            const tx = db.transaction(['records', 'sources', 'meta', 'drafts'], 'readwrite');
+            const tx = db.transaction(['records', 'sources', 'meta', 'drafts', ...(quickTransaction ? ['transactions','imports'] : [])], 'readwrite');
+            let quickResult;
+            if(quickTransaction){const req=tx.objectStore('transactions').getAll();req.onsuccess=()=>{try{const merged=window.LedgerCore.ingest(req.result,[quickTransaction]);merged.transactions.forEach(row=>tx.objectStore('transactions').put(row));quickResult=merged.transactions.find(row=>row.id===quickTransaction.id);tx.objectStore('imports').put({id:quickTransaction.sourceIds[0],status:'done',documentKind:'bill',entryMethod:'text',finishedAt:new Date().toISOString(),extractedCount:1,totals:[],warnings:[],linked:merged.linked});}catch(e){reject(e);tx.abort();}};}
             bump(tx); if(draftId) tx.objectStore('drafts').delete(draftId);
             records.forEach(record => tx.objectStore('records').put(record));
             sources.forEach(source => {
@@ -121,7 +123,7 @@
                     store.put(old ? { ...old, recordIds: [...new Set([...(old.recordIds || []), ...source.recordIds])] } : source);
                 };
             });
-            tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error('保存中止'));
+            tx.oncomplete = () => resolve(quickResult); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error('保存中止'));
         });
     }
     // 账本读-改-写放在一个事务中；多标签页并发也不会重复累计或覆盖其他人的核对。

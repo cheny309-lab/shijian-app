@@ -9,7 +9,7 @@ const { createFeedback } = require('./modules/feedback');
 const { extractBills, makeReflections, providerDiagnosis } = require('./modules/billing-ai');
 
 // 模块 1：运行配置。密钥只从 Render 环境变量读取，不写进网页。
-const VERSION = '2026.10.27-mine-v0.3.0';
+const VERSION = '2026.10.28-desktop-v0.3.1';
 function readConfig(env = process.env) {
   const seconds = Number(env.AI_TIMEOUT_SECONDS || 25);
   return {
@@ -118,6 +118,7 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
     app.get('/' + name, (req, res) => {
       const file = path.join(rootDir, name);
       if (!fs.existsSync(file)) return res.sendStatus(404);
+      res.set('Cache-Control', 'no-store');
       res.sendFile(file);
     });
   }
@@ -217,7 +218,7 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
 
 // 模块 5：Render 启动入口。使用文件所在目录，与启动工作目录无关。
 if (require.main === module) {
-  const required = ['shijian.html', 'assets/ledger-core.js', 'assets/storage.js', 'assets/journal-core.js', 'assets/journal-ui.js', 'assets/app.js', 'assets/app.css','assets/backup-core.js','assets/backup-worker.js','assets/backup-ui.js','assets/drafts-service.js','assets/feedback-ui.js','assets/mine-ui.js','assets/admin-feedback.js','admin/feedback.html'];
+  const required = ['shijian.html', 'assets/ledger-core.js', 'assets/storage.js', 'assets/journal-core.js', 'assets/journal-ui.js', 'assets/app.js', 'assets/app.css','assets/backup-core.js','assets/backup-worker.js','assets/backup-ui.js','assets/drafts-service.js','assets/feedback-ui.js','assets/mine-ui.js','assets/admin-feedback.js','admin/feedback.html','manifest.webmanifest','assets/desktop-ui.js','assets/quick-bill.js','assets/icons/icon-192.png','assets/icons/icon-512.png','assets/icons/icon-maskable-512.png','assets/icons/apple-touch-icon.png','assets/icons/favicon-32.png'];
   for (const file of required) {
     if (!fs.existsSync(path.join(__dirname, file))) {
       console.error('部署缺少文件：' + file + '。请将账单开发包按原文件夹结构完整上传。');
