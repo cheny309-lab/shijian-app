@@ -1,0 +1,12 @@
+(function(){'use strict';
+    const $=id=>document.getElementById(id),el=(tag,text)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;return e;};let credential='';
+    async function api(action,body={}){const response=await fetch('/api/feedback/admin/'+action,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+credential},body:JSON.stringify(body)});const data=await response.json();if(!response.ok)throw Error(data.error?.message||'操作未完成');return data;}
+    const btn=(label,fn)=>{const b=el('button',label);b.type='button';b.className='quiet-button';b.onclick=fn;return b;};
+    async function load(){try{const data=await api('list');$('items').replaceChildren();$('status').textContent=`共有 ${data.items.length} 条反馈；接收端保存期限 ${data.retentionDays} 天。`;
+        for(const row of data.items){const card=el('article');card.append(el('h2',({pending:'待查看',working:'处理中',replied:'已回复',resolved:'已解决'}[row.status]||row.status)),el('p',row.text),el('p','提交于 '+new Date(row.createdAt).toLocaleString()+'\n联系方式：'+(row.contact||'无')+'\n编号：'+row.id),el('p','页面：'+row.diagnostics.page+' · 版本：'+row.diagnostics.version+' · 错误代码：'+(row.diagnostics.errorCode||'无')));
+            for(const a of row.attachments||[]){const img=el('img');img.src=a.data;img.alt='用户主动提交的截图';card.append(img);}
+            const reply=el('textarea');reply.className='journal-editor';reply.maxLength=5000;reply.value=row.reply||'';reply.setAttribute('aria-label','回复 '+row.id);const status=el('select');for(const [value,label]of [['pending','待查看'],['working','处理中'],['replied','已回复'],['resolved','已解决']]){const o=el('option',label);o.value=value;status.append(o);}status.value=row.status;
+            const message=el('p');card.append(reply,status,btn('保存状态与回复',async()=>{try{await api('reply',{id:row.id,reply:reply.value,status:status.value});message.textContent='已保存，用户主动查看反馈时会看到。';}catch(e){message.textContent=e.message;}}),btn('删除这条反馈',()=>{message.replaceChildren(el('span','确认从接收端删除文字、联系信息和附件？ '),btn('确认删除',async()=>{try{await api('delete',{id:row.id});await load();}catch(e){message.textContent=e.message;}}));}),message);$('items').append(card);}
+    }catch(e){$('status').textContent=e.message;}}
+    $('auth').onsubmit=e=>{e.preventDefault();credential=$('token').value;void load();};$('logout').onclick=()=>{credential='';$('token').value='';$('items').replaceChildren();$('status').textContent='当前页面的管理凭证已清除。';};
+})();

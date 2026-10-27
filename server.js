@@ -5,13 +5,15 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
+const { createFeedback } = require('./modules/feedback');
 const { extractBills, makeReflections, providerDiagnosis } = require('./modules/billing-ai');
 
 // 模块 1：运行配置。密钥只从 Render 环境变量读取，不写进网页。
-const VERSION = '2026.10.27-stable-v0.2.0';
+const VERSION = '2026.10.27-mine-v0.3.0';
 function readConfig(env = process.env) {
   const seconds = Number(env.AI_TIMEOUT_SECONDS || 25);
   return {
+    feedbackDir:(env.FEEDBACK_DATA_DIR||'').trim(), feedbackAdminToken:(env.FEEDBACK_ADMIN_TOKEN||'').trim(), feedbackContact:(env.SHIJIAN_CONTACT||'').trim(), feedbackOperator:(env.SHIJIAN_OPERATOR||'').trim(), feedbackRegion:(env.SHIJIAN_SERVER_REGION||'').trim(), feedbackRetentionDays:Number(env.FEEDBACK_RETENTION_DAYS||90),
     apiKey: (env.ZHIPU_API_KEY || '').trim(),
     // 保留原模型默认值，避免在修复时擅自切换账户计费模型。
     model: (env.ZHIPU_MODEL || 'glm-4v').trim(),
@@ -93,6 +95,9 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
     next();
   });
   app.use(express.json({ limit: '8mb' }));
+  const feedback=createFeedback({dataDir:config.feedbackDir||'',adminToken:config.feedbackAdminToken||'',contact:config.feedbackContact||'',operator:config.feedbackOperator||'',region:config.feedbackRegion||'',retentionDays:config.feedbackRetentionDays,logger});
+  app.use('/api/feedback',feedback.router);
+  app.get('/admin-feedback',(req,res)=>{res.set('Cache-Control','no-store');res.sendFile(path.join(rootDir,'admin/feedback.html'));});
 
   const sendPage = (req, res) => {
     res.set('Cache-Control', 'no-store');
@@ -102,7 +107,7 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
   app.get('/shijian.html', sendPage);
   const health = (req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ ok: true, version: VERSION, aiConfigured: Boolean(config.apiKey), model: config.model, imageModel: config.imageModel, billModel: config.billModel || config.imageModel });
+    res.json({ ok: true, version: VERSION, aiConfigured: Boolean(config.apiKey), model: config.model, imageModel: config.imageModel, billModel: config.billModel || config.imageModel,feedbackConfigured:feedback.config.enabled });
   };
   app.get('/health', health);
   app.get('/api/health', health);
@@ -212,7 +217,7 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
 
 // 模块 5：Render 启动入口。使用文件所在目录，与启动工作目录无关。
 if (require.main === module) {
-  const required = ['shijian.html', 'assets/ledger-core.js', 'assets/storage.js', 'assets/journal-core.js', 'assets/journal-ui.js', 'assets/app.js', 'assets/app.css'];
+  const required = ['shijian.html', 'assets/ledger-core.js', 'assets/storage.js', 'assets/journal-core.js', 'assets/journal-ui.js', 'assets/app.js', 'assets/app.css','assets/backup-core.js','assets/backup-worker.js','assets/backup-ui.js','assets/drafts-service.js','assets/feedback-ui.js','assets/mine-ui.js','assets/admin-feedback.js','admin/feedback.html'];
   for (const file of required) {
     if (!fs.existsSync(path.join(__dirname, file))) {
       console.error('部署缺少文件：' + file + '。请将账单开发包按原文件夹结构完整上传。');

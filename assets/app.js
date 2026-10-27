@@ -10,7 +10,10 @@
     const button = (text, fn, cls = 'quiet-button') => { const e = node('button', cls, text); e.type = 'button'; e.addEventListener('click', fn); return e; };
     const imageOK = s => typeof s === 'string' && /^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(s);
     const currentRecord = key => S.records.find(r => r.id === key);
-    const Journals = window.ShijianJournals.create({ S, C, J, DB, node, button, field, input, modal, closeModal, refresh, report, toast, id, openRecord, showSource, runJournal, scheduleReflections, render });
+    const Drafts = window.ShijianDrafts.create({DB,node,button,ready:()=>S.ready,composerValue:()=>({text:$('messageInput').value,images:S.drafts,intent:$('recordIntent').value,bookId:$('uploadBook').value,useAI:$('useAI').checked}),setComposer:draft=>{$('messageInput').value=draft.text||'';S.drafts=draft.images||[];$('recordIntent').value=draft.intent||'auto';$('uploadBook').value=books().some(b=>b.id===draft.bookId)?draft.bookId:'daily';$('useAI').checked=!!draft.useAI;renderDrafts();}});
+    const Journals = window.ShijianJournals.create({ S, C, J, DB, node, button, field, input, modal, closeModal, refresh, report, toast, id, openRecord, showSource, runJournal, scheduleReflections, render, Drafts });
+    const Mine = window.ShijianMine.create({S,C,J,DB,node,button,modal,closeModal,toast,report,refresh,download,books,exportCSV,Journals,Drafts,openRecord,resumeComposer:async targetId=>{await openInputPanel(targetId);},getErrorCode:()=>S.lastErrorCode||'',preferencesChanged:()=>{$('useAI').checked=S.autoAI;scheduleReflections();}});
+    let lastModalFocus;
     let toastTimer, reflectionTimer, reflectionRunning = false;
     const runningJournal = new Set(), runningBills = new Set();
     const tasks = []; let activeTasks = 0;
@@ -30,9 +33,9 @@
     function notice(text) { $('storageNotice').textContent = text; $('storageNotice').hidden = !text; }
     function report(error) {
         const text = error && error.name === 'QuotaExceededError' ? '设备空间不足，输入仍保留。请先导出备份并释放空间。' : (error && error.message) || '这次操作尚未完成，请稍后重试。';
-        toast(text);
+        S.lastErrorCode=error?.code||''; toast(text);
     }
-    async function refresh() { Object.assign(S, await DB.snapshot(false)); render(); }
+    async function refresh() { Object.assign(S, await DB.snapshot(false)); S.hideAmounts=!!S.meta.find(m=>m.key==='hideAmounts')?.value;S.autoAI=S.meta.find(m=>m.key==='autoAI')?.value!==false;render(); }
     function books() {
         const value = (S.meta.find(m => m.key === 'books') || {}).value;
         return [{ id: 'daily', name: '日常' }, ...(Array.isArray(value) ? value.filter(b => b.id && b.id !== 'daily' && typeof b.name === 'string') : [])];
@@ -124,14 +127,14 @@
         return { id: 'file-' + await hash(await file.arrayBuffer()), name: file.name, original, preview, mime: file.type, bytes: file.size };
     }
     function updateSaveButton() {
-        $('saveButton').disabled = !S.ready || S.saving || S.imageLoading;
-        $('saveButton').textContent = S.saving ? '保存中…' : S.imageLoading ? '图片处理中…' : '保存';
+        $('saveButton').disabled = !S.ready || S.saving || S.imageLoading || S.resuming;
+        $('saveButton').textContent = S.saving ? '保存中…' : S.resuming ? '接回草稿中…' : S.imageLoading ? '图片处理中…' : '保存';
     }
     function renderDrafts() {
         const root = $('draftImages'); root.replaceChildren();
         S.drafts.forEach((draft, index) => {
             const box = node('div', 'draft-thumb'); const img = node('img'); img.src = draft.preview; img.alt = '待保存图片 ' + (index + 1);
-            box.append(img, button('移除', () => { S.drafts.splice(index, 1); renderDrafts(); })); root.append(box);
+            box.append(img, button('移除', () => { S.drafts.splice(index, 1); renderDrafts(); Drafts.scheduleComposer(); })); root.append(box);
         });
     }
     async function onImages(event) {
@@ -144,25 +147,28 @@
             const prepared = [];
             for (const file of files) prepared.push(await prepare(file));
             for (const draft of prepared) if (!S.drafts.some(d => d.id === draft.id)) S.drafts.push(draft);
-            renderDrafts();
+            renderDrafts(); Drafts.scheduleComposer();
         } catch (error) { report(error); }
         finally { S.imageLoading = false; updateSaveButton(); }
     }
-    function openInputPanel() {
+    async function openInputPanel(targetId) {
+        if(S.resuming)return;
         fillUploadBook();
         $('inputPanel').classList.add('show'); $('inputOverlay').classList.add('show');
         $('inputPanel').setAttribute('aria-hidden', 'false'); document.body.classList.add('panel-open');
+        S.resuming=true;const controls=[$('messageInput'),$('imageInput'),$('recordIntent'),$('uploadBook'),$('useAI')];controls.forEach(e=>e.disabled=true);updateSaveButton();
+        try{await Drafts.resumeComposer(typeof targetId==='string'?targetId:undefined);}catch(error){report(error);}finally{S.resuming=false;controls.forEach(e=>e.disabled=false);updateSaveButton();}
     }
     function closeInputPanel() {
         if (S.saving) return;
         $('inputPanel').classList.remove('show'); $('inputOverlay').classList.remove('show');
-        $('inputPanel').setAttribute('aria-hidden', 'true'); document.body.classList.remove('panel-open'); $('messageInput').blur();
+        $('inputPanel').setAttribute('aria-hidden', 'true'); document.body.classList.remove('panel-open'); $('messageInput').blur(); void Drafts.saveComposer();
     }
     async function saveRecord() {
-        if (!S.ready || S.saving || S.imageLoading) return;
+        if (!S.ready || S.saving || S.imageLoading || S.resuming) return;
         const text = $('messageInput').value.trim();
         if (!text && !S.drafts.length) { toast('一句话，或一张图片，都可以。'); return; }
-        S.saving = true; updateSaveButton();
+        S.saving = true; updateSaveButton(); await Drafts.pause();
         const now = new Date().toISOString(), batchId = id(), useAI = $('useAI').checked, intent = $('recordIntent').value === 'auto' && /^(?:请)?(?:只记账|仅记账|仅入账)/.test(text) ? 'bill' : $('recordIntent').value, bookId = $('uploadBook').value || 'daily';
         const records = [], sources = [];
         try {
@@ -176,7 +182,7 @@
                 records.push(record);
                 sources.push({ ...(draft || {}), id: sourceId, recordIds: [recordId], text: record.text, uploadedAt: now, batchId, bookId, kind: draft ? 'image' : 'text' });
             }
-            await DB.saveBatch(records, sources);
+            await DB.saveBatch(records, sources, Drafts.getComposerId());
             $('messageInput').value = ''; S.drafts = []; renderDrafts();
             S.saving = false; closeInputPanel(); await refresh(); toast(useAI ? '已保存在此设备，正在轻轻整理。' : '已保存在此设备，未发送给AI。');
             if (useAI) {
@@ -185,7 +191,7 @@
                 for (const source of sources) if (intent === 'bill' || source.preview || /[¥￥$元]|支出|收入|花了|付款|退款/.test(source.text)) void runBills(source.id);
             }
         } catch (error) { notice('本次保存未完成，输入仍保留。请检查设备存储并导出已有记录。'); report(error); }
-        finally { S.saving = false; updateSaveButton(); }
+        finally { S.saving = false; Drafts.unpause(); updateSaveButton(); }
     }
 
     // 日记模块：只按最新记录合并 AI 结果，用户编辑后的正文绝不被迟到回复覆盖。
@@ -195,6 +201,7 @@
         try {
             await queue(async () => {
                 const record = await DB.get('records', recordId); if (!record || record.journalDeleted || !(C.onTimeline(record) || manual && record.journalState === 'draft')) return;
+                const requestEpoch=(await DB.get('meta','importEpoch'))?.value||'';
                 await DB.updateRecord(recordId, old => ({ ...old, aiStatus: 'generating', error: '' })); await refresh();
                 try {
                     let journalText = record.transactionIds ? J.prompt(record, await DB.getAll('transactions')) : record.text;
@@ -206,9 +213,9 @@
                     const data = await post('/api/chat', message(journalText, record.receipt ? null : record.image), 65000);
                     const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
                     if (typeof text !== 'string' || !text.trim()) throw Error('这次没有整理出文字，原始记录仍在。');
-                    await DB.updateRecord(recordId, old => ({ ...old, ...(old.journalEdited ? { aiCandidate: text.trim() } : { ai: text.trim() }), aiStatus: 'done', error: '', errorCode: '', requestId: '' }));
+                    await DB.updateRecord(recordId, (old,epochChanged) => ({ ...old, ...(old.journalEdited||epochChanged ? { aiCandidate: text.trim() } : { ai: text.trim() }), aiStatus: 'done', error: '', errorCode: '', requestId: '' }),requestEpoch);
                 } catch (error) {
-                    await DB.updateRecord(recordId, old => ({ ...old, aiStatus: 'failed', error: error.message, errorCode: error.code || '', requestId: error.requestId || '' }));
+                    await DB.updateRecord(recordId, (old,epochChanged) => epochChanged?old:({ ...old, aiStatus: 'failed', error: error.message, errorCode: error.code || '', requestId: error.requestId || '' }),requestEpoch);
                 }
             });
         } catch (error) { notice('原始记录已保留，但整理状态未能写入设备，请先导出备份。'); }
@@ -247,12 +254,17 @@
         }
     }
     function modal(title) {
+        if(!$('detailModal').classList.contains('show'))lastModalFocus=document.activeElement;
+        document.querySelectorAll('.header,.bottom-container,#timelineContainer,#billsPage,#minePage').forEach(e=>{e.inert=true;e.setAttribute('aria-hidden','true');});
+        $('detailModal').setAttribute('role','dialog');$('detailModal').setAttribute('aria-modal','true');$('detailModal').setAttribute('aria-label',title);
+        window.dispatchEvent(new Event('shijian-modal-close'));
         $('detailModal').classList.remove('choice-sheet');
         const root = $('modalContent'); root.replaceChildren(); const card = node('div', 'detail-card'); card.append(node('h2', 'detail-title', title)); root.append(card);
         $('detailModal').classList.add('show'); $('detailModal').scrollTop = 0; return card;
     }
-    function closeModal() { $('detailModal').classList.remove('show', 'choice-sheet'); }
-    async function showSource(sourceId) {
+    function closeModal() { window.dispatchEvent(new Event('shijian-modal-close')); $('detailModal').classList.remove('show', 'choice-sheet');document.querySelectorAll('.header,.bottom-container,#timelineContainer,#billsPage,#minePage').forEach(e=>{e.inert=false;e.removeAttribute('aria-hidden');});if(lastModalFocus?.isConnected)lastModalFocus.focus(); }
+    async function showSource(sourceId,explicit=false) {
+        if(S.hideAmounts&&!explicit){const box=modal('查看原始资料');box.append(node('p','muted','原始图片和文字可能包含真实金额，不会自动遮挡。'),button('确认查看原始资料',()=>{void showSource(sourceId,true);},'primary-button'));return;}
         let source;
         try { source = await DB.get('sources', sourceId); } catch (error) { report(error); return; }
         if (!source) { toast('未找到这份来源。'); return; }
@@ -506,7 +518,7 @@
         }));
         if (t.refundOf && S.transactions.some(other => other.id === t.refundOf)) root.append(button('查看退款对应的原消费', () => openTransaction(t.refundOf)));
         S.transactions.filter(other => !other.deleted && other.refundOf === t.id).forEach(other => root.append(button('查看关联退款 · ' + amount(other.amountMinor, other.currency), () => openTransaction(other.id))));
-        if (t.reasons.length || t.proposal) root.append(node('p', 'review-note', [...t.reasons, t.proposal].filter(Boolean).join('；')));
+        if (t.reasons.length || t.proposal) root.append(node('p', 'review-note', S.hideAmounts?'有些字段待核对，展开编辑后可以查看。':[...t.reasons, t.proposal].filter(Boolean).join('；')));
         const duplicate = S.transactions.find(other => other.id === t.duplicateOf);
         if (duplicate) {
             root.append(node('p', 'review-note', '可能对应已有记录：' + (duplicate.merchant || '交易') + ' · ' + amount(duplicate.amountMinor, duplicate.currency) + ' · ' + duplicate.occurredAt));
@@ -558,7 +570,7 @@
                 await refresh(); closeModal(); toast(confirm ? '已更新这一笔，累计也已重新计算。' : '修改已保存，尚未计入累计。'); scheduleReflections();
             } catch (error) { errorBox.textContent = error.message; }
         };
-        form.append(button('确认并入账', () => { void save(true); }, 'primary-button'), button('先保存修改，稍后确认', () => { void save(false); })); root.append(form);
+        form.append(button('确认并入账', () => { void save(true); }, 'primary-button'), button('先保存修改，稍后确认', () => { void save(false); })); if(S.hideAmounts){form.hidden=true;root.append(button('编辑这一笔（显示真实金额）',()=>{form.hidden=false;}));} root.append(form);
         root.append(node('h3', 'detail-label', '每一笔，都有来处'));
         t.sourceIds.forEach(sid => root.append(button('查看来源原图／文字', () => showSource(sid))));
         S.records.filter(r => !r.journalDeleted && J.linked(r, t)).forEach(r => root.append(button('查看关联的生活记录', () => openRecord(r.id))));
@@ -571,15 +583,15 @@
     // 回看模块：仅下一次唤醒时补做已结束期间，不通知，不填补空白日期。
     function scheduleReflections() {
         clearTimeout(reflectionTimer);
-        if (!S.ready || !S.autoAI || activeTasks || tasks.length || reflectionRunning) return;
+        if (!S.ready || !S.autoAI || S.meta.some(m=>m.key==='importPauseAI'&&m.value) || activeTasks || tasks.length || reflectionRunning) return;
         reflectionTimer = setTimeout(() => { void runReflections(); }, 1800);
     }
     async function runReflections(manualIds) {
-        if (reflectionRunning || !S.ready || (!S.autoAI && !manualIds)) return;
+        if (reflectionRunning || !S.ready || (!S.autoAI && !manualIds) || (!manualIds&&S.meta.some(m=>m.key==='importPauseAI'&&m.value))) return;
         reflectionRunning = true;
-        let jobs = [];
+        let jobs = [],requestEpoch='';
         try {
-            await refresh();
+            await refresh();requestEpoch=(await DB.get('meta','importEpoch'))?.value||'';
             const existing = manualIds ? S.reflections.filter(r => !manualIds.includes(r.id)) : S.reflections;
             jobs = C.reflectionJobs(S.transactions, S.records.filter(r => r.aiAllowed === true && C.onTimeline(r)), existing, C.dayKey(), manualIds ? Number.MAX_SAFE_INTEGER : 6);
             if (manualIds) jobs = jobs.filter(j => manualIds.includes(j.id)).slice(0, 6);
@@ -593,13 +605,11 @@
             for (const job of jobs) {
                 const item = data.items && data.items.find(i => i.id === job.id && typeof i.text === 'string');
                 if (!item) throw Error('生活回看返回不完整。');
-                const old = await DB.get('reflections', job.id);
-                await DB.put('reflections', { ...old, id: job.id, ...(old && old.edited ? { candidate: item.text } : { text: item.text }), revision: job.revision, status: 'done', error: '', updatedAt: new Date().toISOString() });
+                await DB.updateReflection(job.id,(old,epochChanged)=>epochChanged?(old?{...old,candidate:item.text}:undefined):({ ...old, id: job.id, ...(old && old.edited ? { candidate: item.text } : { text: item.text }), revision: job.revision, status: 'done', error: '', updatedAt: new Date().toISOString() }),requestEpoch);
             }
         } catch (error) {
             for (const job of jobs) {
-                const old = await DB.get('reflections', job.id).catch(() => null);
-                if (old) await DB.put('reflections', { ...old, status: 'failed', error: error.message }).catch(() => {});
+                await DB.updateReflection(job.id,(old,epochChanged)=>old&&!epochChanged?({...old,status:'failed',error:error.message}):old,requestEpoch).catch(()=>{});
             }
         } finally { reflectionRunning = false; await refresh().catch(report); }
     }
@@ -626,33 +636,16 @@
     function download(blob, name) {
         const url = URL.createObjectURL(blob), a = node('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1500);
     }
-    async function exportData() {
-        try {
-            const data = await DB.snapshot(); let legacyRaw = null; try { legacyRaw = localStorage.getItem('shijian_history'); } catch (_) {}
-            download(new Blob([JSON.stringify({ version: C.VERSION, exportedAt: new Date().toISOString(), ...data, legacyRaw }, null, 2)], { type: 'application/json' }), 'shijian-backup-' + C.dayKey() + '.json'); toast('已导出完整本机备份，包含来源资料。');
-        } catch (error) { report(error); }
-    }
+    async function exportData() { await Mine.exportBackup(); }
     async function exportCSV(options = {}) {
         try {
-            const rows = C.inBook(await DB.getAll('transactions'), options.book || 'all').filter(t => !options.month || (t.occurredAt || '').startsWith(options.month));
+            const rows = C.inBook(await DB.getAll('transactions'), options.book || 'all').filter(t => (!t.deleted||options.includeDeleted) && (!options.month || (t.occurredAt || '').startsWith(options.month)));
             const cell = value => '"' + String(value == null ? '' : value).replace(/^(?:\s*[=+\-@]|[\t\r])/, s => "'" + s).replace(/"/g, '""') + '"';
             const table = [['编号', '发生时间', '来源商户', '展示简称', '细分用途', '账本', '方向', '金额', '币种', '类别', '标签', '状态', '已移除', '来源编号'], ...rows.map(t => [t.id, t.occurredAt, t.merchant, C.merchantLabel(t), t.subcategory || '', bookName(t.bookId), t.direction, t.amountMinor === null || !(t.currency in C.DIGITS) ? t.proposedAmount : C.decimal(t.amountMinor, t.currency), t.currency, t.category, t.tags.join('、'), t.status, t.deleted ? '是' : '否', t.sourceIds.join(';')])];
             download(new Blob(['\ufeff' + table.map(row => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }), 'shijian-bills-' + C.dayKey() + '.csv');
         } catch (error) { report(error); }
     }
-    function renderMine() {
-        const root = $('minePage'); root.replaceChildren(); root.append(node('h2', '', '属于自己的生活'), node('p', 'muted', '默认私密，留在你的设备里。'));
-        const box = node('section', 'bill-overview'); box.append(node('p', '', S.records.filter(C.onTimeline).length + ' 条生活记录 · ' + S.records.filter(r => !r.journalDeleted && r.journalState !== 'draft' && !C.onTimeline(r)).length + ' 份资料 · ' + S.transactions.filter(t => !t.deleted).length + ' 笔交易'), node('p', 'muted', '当前保存于此浏览器，没有云同步。换设备或清除网站数据不会自动带走记录，请导出备份。'));
-        box.append(button('导出完整备份 JSON', exportData, 'primary-button'), button('导出账单 CSV', exportCSV)); root.append(box);
-        root.append(button('日记草稿', Journals.drafts), button('最近删除 · ' + S.records.filter(r => r.journalDeleted).length, Journals.trash));
-        const label = node('label', 'check-label'), toggle = node('input'); toggle.type = 'checkbox'; toggle.checked = S.autoAI;
-        toggle.addEventListener('change', async () => {
-            try { await DB.put('meta', { key: 'autoAI', value: toggle.checked }); S.autoAI = toggle.checked; $('useAI').checked = S.autoAI; renderMine(); if (!S.autoAI) clearTimeout(reflectionTimer); else scheduleReflections(); }
-            catch (error) { toggle.checked = S.autoAI; report(error); }
-        }); label.append(toggle, node('span', '', '新记录默认使用AI整理，并在打开时梳理已结束的日／月')); root.append(label);
-        root.append(node('p', 'muted', '开启时，所选文字和压缩图片会发送至配置的AI服务；原文件留在本机。每次保存也可单独关闭AI。关闭默认开关不会撤回已经发送的请求。'));
-        root.append(node('p', 'muted', '完整的导入恢复、账号与数据删除设置将在“我的”模块继续完善。本版没有公开动态或自动分享。'), node('p', 'muted small', '拾间 · ' + C.VERSION));
-    }
+    function renderMine() { Mine.render(); }
     function render() {
         renderTimeline(); renderBills(); renderMine();
         $('timelineContainer').hidden = S.page !== 'timeline'; $('billsPage').hidden = S.page !== 'bills'; $('minePage').hidden = S.page !== 'mine';
@@ -668,8 +661,11 @@
     }
     async function init() {
         $('currentMonth').textContent = new Date().getFullYear() + '年' + (new Date().getMonth() + 1) + '月';
+        $('messageInput').addEventListener('input',Drafts.scheduleComposer);
+        for(const key of ['recordIntent','uploadBook','useAI'])$(key).addEventListener('change',Drafts.scheduleComposer);
+        const draftStatus=node('p','muted');draftStatus.id='inputDraftStatus';$('draftImages').after(draftStatus);
         $('imageInput').addEventListener('change', onImages); $('exportButton').addEventListener('click', exportData);
-        document.querySelectorAll('[data-page]').forEach(e => e.addEventListener('click', () => { S.page = e.dataset.page; render(); }));
+        document.querySelectorAll('[data-page]').forEach(e => e.addEventListener('click', () => { S.previousPage=S.page; S.page = e.dataset.page; render(); }));
         window.addEventListener('shijian-storage-closed', () => { S.ready = false; updateSaveButton(); notice('另一页面正在升级数据，请关闭其他拾间页面后刷新。'); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeInputPanel(); } });
         const viewport = window.visualViewport;
@@ -682,8 +678,8 @@
             // 打开的另一页可能仍在工作；只有超时任务才标为中断，不自动再次调用收费接口。
             for (const job of S.imports) if (job.status === 'running' && Date.now() - Date.parse(job.startedAt || 0) > 130000) await DB.put('imports', { ...job, status: 'failed', error: '上次识别未完成，原始资料仍在，可以重试。' });
             for (const r of S.reflections) if (r.status === 'running') await DB.put('reflections', { ...r, status: 'failed', error: '上次梳理未完成，账本不受影响。' });
-            S.ready = true; await refresh(); scheduleReflections();
-        } catch (error) { notice('设备存储尚未就绪：' + error.message + ' 请保留已有数据，不要清除网站存储。'); }
+            S.ready = true; await refresh(); const task=S.meta.find(m=>m.key==='importTask')?.value;if(task?.state==='reading')notice('上次恢复未完成，请重新选择备份文件。原有记录未作更改。');scheduleReflections();
+        } catch (error) { S.lastErrorCode='STORAGE_INIT';notice('此浏览器的保存功能暂时未就绪。请关闭其他拾间页面后刷新，保留已有数据，不要清除网站存储。'); }
         render(); updateSaveButton();
         document.addEventListener('visibilitychange', () => { if (!document.hidden && S.ready) void recoverImports().then(refresh).then(scheduleReflections).catch(report); });
         setInterval(() => { if (S.ready) void recoverImports().catch(() => {}); }, 30000);

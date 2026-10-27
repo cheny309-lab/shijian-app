@@ -2,7 +2,7 @@
 (function () {
     'use strict';
     window.ShijianJournals = { create(deps) {
-        const { S, C, J, DB, node, button, field, input, modal, closeModal, refresh, report, toast, id, openRecord, showSource, runJournal, scheduleReflections } = deps;
+        const { S, C, J, DB, node, button, field, input, modal, closeModal, refresh, report, toast, id, openRecord, showSource, runJournal, scheduleReflections, Drafts } = deps;
         const now = () => new Date().toISOString();
         const offers = new Set(); let disposeEditor = () => {};
         const visible = root => root.isConnected && document.getElementById('detailModal').classList.contains('show');
@@ -66,6 +66,7 @@
             field(root, '当时留下的话 · 可修改，初次输入仍保留', original);
             const text = node('textarea', 'journal-editor'); text.value = J.body(record); text.maxLength = 8000; text.setAttribute('aria-label', '编辑时光切片');
             root.append(node('p', 'detail-label', '属于你的文字，可以反复修改'), text);
+            void Drafts.attachEditor(root,record,{title,displayDate:date,text:original,ai:text}).catch(report);
             const errorBox = node('p', 'form-error'); errorBox.setAttribute('role', 'status'); root.append(errorBox);
             const status = node('p', 'muted'); root.append(status);
             let base = { title: J.title(record), date: J.day(record), text: record.text || '', ai: J.body(record) };
@@ -86,7 +87,7 @@
             };
             const save = button('保存文字', async () => {
                 save.disabled = true;
-                try { const value = await DB.updateRecord(record.id, update); revision = value.editRevision; base = { title: title.value, date: date.value, text: original.value, ai: text.value }; await refresh(); errorBox.textContent = ''; toast('已保存你的修改。'); scheduleReflections(); }
+                try { const value = await DB.updateRecord(record.id, update); await Drafts.savedEditor(record.id); revision = value.editRevision; base = { title: title.value, date: date.value, text: original.value, ai: text.value }; await refresh(); errorBox.textContent = ''; toast('已保存你的修改。'); scheduleReflections(); }
                 catch (error) { errorBox.textContent = error.message; } finally { save.disabled = false; }
             }, 'primary-button'); root.append(save);
             if (record.journalState === 'draft') {
@@ -98,7 +99,7 @@
                             const edited = update(old); const latest = { ...state, records: state.records.map(r => r.id === old.id ? edited : r) };
                             return { records: J.publish(latest, [old.id], now()) };
                         });
-                        await refresh(); if (visible(root)) { S.page = 'timeline'; deps.render(); openRecord(record.id); } toast('这一段，已留在时光里。'); scheduleReflections();
+                        await Drafts.savedEditor(record.id); await refresh(); if (visible(root)) { S.page = 'timeline'; deps.render(); openRecord(record.id); } toast('这一段，已留在时光里。'); scheduleReflections();
                     } catch (error) { errorBox.textContent = error.message; publish.disabled = false; }
                 }, 'primary-button'); root.append(publish, button('查看全部草稿', drafts));
             }
