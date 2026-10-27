@@ -8,7 +8,7 @@ const { randomUUID } = require('crypto');
 const { extractBills, makeReflections, providerDiagnosis } = require('./modules/billing-ai');
 
 // 模块 1：运行配置。密钥只从 Render 环境变量读取，不写进网页。
-const VERSION = '2026.10.26-bills-v0.1.1';
+const VERSION = '2026.10.27-stable-v0.2.0';
 function readConfig(env = process.env) {
   const seconds = Number(env.AI_TIMEOUT_SECONDS || 25);
   return {
@@ -21,7 +21,7 @@ function readConfig(env = process.env) {
     timeout: Math.min(55, Math.max(1, Number.isFinite(seconds) ? seconds : 25)) * 1000
   };
 }
-const SYSTEM_PROMPT = '你是拾间的生活记录助手。不评判、不催促，只依据用户明确提供的文字和图片，写一段不超过100字的时光切片。不得从商户或金额推断疲惫、孤独、治愈、同行人和消费动机。用户已说明加班或辛苦时可以温和回应。没有依据就少写，不伪造经历。不输出HTML，不重复要求用户记录。';
+const SYSTEM_PROMPT = '你是拾间的生活记录助手。语气自然、克制、有温度，不写公文和流水账播报，不逐项罗列商户、日期和金额；围绕用户明确留下的一个细节写，不把温柔等同于赞美。不评判、不催促，只依据用户明确提供的文字和图片，写一段不超过100字的时光切片。不得从商户或金额推断疲惫、孤独、治愈、同行人和消费动机。用户已说明加班或辛苦时可以温和回应。没有依据就少写，不伪造经历。不输出HTML，不重复要求用户记录。';
 
 // 模块 2：请求校验。兼容原网页 messages 格式，只转发本次用户内容。
 function normalizeMessage(body) {
@@ -212,7 +212,7 @@ function createApp({ config = readConfig(), httpClient = axios, rootDir = __dirn
 
 // 模块 5：Render 启动入口。使用文件所在目录，与启动工作目录无关。
 if (require.main === module) {
-  const required = ['shijian.html', 'assets/ledger-core.js', 'assets/storage.js', 'assets/app.js', 'assets/app.css'];
+  const required = ['shijian.html', 'assets/ledger-core.js', 'assets/storage.js', 'assets/journal-core.js', 'assets/journal-ui.js', 'assets/app.js', 'assets/app.css'];
   for (const file of required) {
     if (!fs.existsSync(path.join(__dirname, file))) {
       console.error('部署缺少文件：' + file + '。请将账单开发包按原文件夹结构完整上传。');

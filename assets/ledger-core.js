@@ -5,11 +5,40 @@
     else root.LedgerCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     'use strict';
-    const VERSION = '2026.10.26-bills-v0.1.1';
-    const CATEGORIES = ['餐饮', '出行', '居家', '购物', '健康', '学习', '休闲', '其他'];
+    const VERSION = '2026.10.27-stable-v0.2.0';
+    const CATEGORIES = ['餐饮', '出行', '居家', '购物', '健康', '学习', '休闲', '生活服务', '其他'];
     const DIGITS = { CNY: 2, USD: 2, HKD: 2, EUR: 2, GBP: 2, SGD: 2, AUD: 2, CAD: 2, JPY: 0, TWD: 2, KRW: 0 };
     const clean = (value, max = 200) => typeof value === 'string' ? value.trim().slice(0, max) : '';
     const key = value => clean(value).normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+    function safeAlias(alias, merchant) {
+        const text = clean(alias, 100), original = key(merchant), candidate = key(text).replace(/[\p{P}\p{S}]/gu, '');
+        if (!candidate) return '';
+        let at = 0;
+        for (const char of candidate) { const next = original.indexOf(char, at); if (next < 0) return ''; at = next + char.length; }
+        return text;
+    }
+    function merchantLabel(t) {
+        if (t.displayName) return clean(t.displayName, 100);
+        return clean(t.merchant, 100).replace(/^(?:扫二维码付款|扫码付款|二维码收款|扫码支付|付款给)[\s:：\-—]*(?:给)?/, '').trim() || clean(t.merchant, 100) || '一笔记录';
+    }
+    function bookOf(t) { return t.bookId || 'daily'; }
+    function inBook(rows, book) { return !book || book === 'all' ? rows : rows.filter(t => bookOf(t) === book); }
+    function documentKind(data) {
+        if ((data.transactions || []).length || (data.totals || []).length) return 'bill';
+        return ['bill', 'life'].includes(data.documentKind) ? data.documentKind : 'uncertain';
+    }
+    function routeRecord(record, kind) {
+        // 历史记录保持原展示；只有本版新增记录自动分流，用户选择永远优先。
+        if (!record.routingVersion) return record;
+        if (record.placementUser) return { ...record, receipt: kind === 'bill' };
+        let placement = record.placement;
+        if (record.intent === 'bill') placement = 'bills';
+        else if (record.intent === 'journal' || !record.image) placement = 'journal';
+        else if (kind === 'bill') placement = record.hasNarrative ? 'journal' : 'bills';
+        else placement = kind === 'life' ? 'journal' : 'pending';
+        return { ...record, placement, receipt: kind === 'bill', aiStatus: placement === 'journal' ? record.aiStatus : 'idle' };
+    }
+    function onTimeline(record) { return !record.journalDeleted && record.journalState !== 'draft' && (!record.placement || record.placement === 'journal'); }
     function money(value, currency = 'CNY') {
         if (!(currency in DIGITS)) return null;
         const s = String(value == null ? '' : value).trim();
@@ -72,6 +101,7 @@
             amountMinor, proposedAmount: clean(String(raw.amount == null ? '' : raw.amount), 30), currency,
             direction, paymentState, merchant: clean(raw.merchant, 100), category: CATEGORIES.includes(raw.category) ? raw.category : '其他',
             categoryTentative: true, tags: Array.isArray(raw.tags) ? [...new Set(raw.tags.map(t => clean(t, 20)).filter(Boolean))].slice(0, 5) : [],
+            subcategory: clean(raw.subcategory, 30), displayName: safeAlias(raw.displayName, raw.merchant), bookId: 'daily',
             provider: clean(raw.provider, 40), transactionId: clean(raw.transactionId, 120), identityVerified: verified.identity === true && !!clean(raw.transactionId, 120) && evidence.transactionId.includes(clean(raw.transactionId, 120)) && !!key(raw.provider) && key(evidence.provider).includes(key(raw.provider)), originalTransactionId: clean(raw.originalTransactionId, 120), refundOf: null, evidence,
             status: reasons.length ? 'review' : 'confirmed', confirmation: reasons.length ? '' : 'system', reasons,
             proposal: clean(raw.proposal, 300), duplicateOf: null, deleted: false, history: [], createdAt: new Date(now).toISOString()
@@ -90,7 +120,8 @@
     function ingest(existing, candidates) {
         const all = existing.map(t => ({ ...t, sourceIds: [...t.sourceIds], history: [...(t.history || [])] }));
         let linked = 0, added = 0;
-        for (const input of candidates) {
+        for (const candidate of candidates) {
+            const input = { ...candidate, sourceIds: [...candidate.sourceIds], history: [...(candidate.history || [])], reasons: [...(candidate.reasons || [])] };
             if (all.some(t => t.id === input.id)) continue;
             const exact = all.find(t => sameReceipt(t, input));
             if (exact && exact.amountMinor === input.amountMinor && exact.currency === input.currency && exact.occurredAt === input.occurredAt) {
@@ -107,7 +138,7 @@
         }
         for (const t of all.filter(t => t.direction === 'refund' && !t.refundOf && t.originalTransactionId && t.provider)) {
             const original = all.filter(o => !o.deleted && o.direction === 'expense' && o.transactionId === t.originalTransactionId && key(o.provider) === key(t.provider) && o.currency === t.currency);
-            if (original.length === 1) t.refundOf = original[0].id;
+            if (original.length === 1) { t.refundOf = original[0].id; if (!t.bookManuallySet) t.bookId = bookOf(original[0]); }
         }
         return { transactions: all, linked, added };
     }
@@ -166,7 +197,7 @@
         }
         // 普通日记也可形成回看；空白日期绝不补写。
         for (const r of records) {
-            const day = dayKey(r.time);
+            const day = date(r.displayDate) ? r.displayDate.slice(0, 10) : dayKey(r.time);
             for (const period of [day, day.slice(0, 7)]) {
                 if (period.length === 10 ? period >= today : period >= today.slice(0, 7)) continue;
                 if (!periods.has(period)) periods.set(period, []);
@@ -176,14 +207,14 @@
         for (const [id, rows] of [...periods].sort(([a], [b]) => a.length - b.length || b.localeCompare(a))) {
             const totals = summary(rows, id.slice(0, 7)).currencies;
             const moneyText = Object.entries(totals).map(([currency, t]) => ({ currency, income: decimal(t.income, currency), expense: decimal(t.expense, currency), refund: decimal(t.refund, currency) }));
-            const periodRecords = records.filter(r => dayKey(r.time).startsWith(id));
+            const periodRecords = records.filter(r => (date(r.displayDate) ? r.displayDate.slice(0, 10) : dayKey(r.time)).startsWith(id));
             const notes = periodRecords.map(r => (r.journalEdited ? r.ai : r.text) || '').filter(Boolean).slice(0, 15).map(s => s.slice(0, 160));
-            const facts = { id, totals: moneyText, count: rows.length, recordCount: periodRecords.length, imageRecordCount: periodRecords.filter(r => !!r.image).length, merchants: [...new Set(rows.map(t => t.merchant).filter(Boolean))].slice(0, 12), notes };
-            const revision = digest({ facts, rows: rows.map(t => [t.id, t.amountMinor, t.occurredAt, t.category, t.tags]).sort() });
+            const facts = { id, totals: moneyText, count: rows.length, recordCount: periodRecords.length, imageRecordCount: periodRecords.filter(r => !!r.image).length, merchants: [...new Set(rows.map(t => merchantLabel(t)).filter(Boolean))].slice(0, 12), notes };
+            const revision = digest({ style: 'v012-natural', facts, rows: rows.map(t => [t.id, t.amountMinor, t.occurredAt, t.category, t.tags]).sort() });
             const old = reflections.find(r => r.id === id);
             if (!old || (old.revision !== revision && old.attemptedRevision !== revision)) jobs.push({ ...facts, revision });
         }
         return jobs.slice(0, limit);
     }
-    return { VERSION, CATEGORIES, DIGITS, clean, money, decimal, date, dayKey, normalize, sameReceipt, possibleDuplicate, ingest, summary, checkTotals, edit, digest, reflectionJobs };
+    return { VERSION, CATEGORIES, DIGITS, clean, money, decimal, date, dayKey, normalize, sameReceipt, possibleDuplicate, ingest, summary, checkTotals, edit, digest, reflectionJobs, merchantLabel, bookOf, inBook, documentKind, routeRecord, onTimeline };
 });

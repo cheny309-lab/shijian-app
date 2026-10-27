@@ -149,5 +149,28 @@
             tx.oncomplete = () => resolve(value); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error);
         });
     }
-    window.ShijianStorage = { init, getAll, get, put, snapshot, saveBatch, changeLedger, updateRecord };
+    // 日记草稿、发布、恢复按同一快照校验；并发标签页也不能重复发布同一笔交易。
+    function changeJournals(transform) {
+        return new Promise((resolve, reject) => {
+            const names = ['records', 'sources', 'transactions'], tx = db.transaction(names, 'readwrite');
+            const state = {}; let pending = names.length, result;
+            names.forEach(name => {
+                const req = tx.objectStore(name).getAll();
+                req.onsuccess = () => {
+                    state[name] = req.result;
+                    if (--pending) return;
+                    try {
+                        result = transform(state);
+                        (result.records || []).forEach(r => tx.objectStore('records').put(r));
+                        for (const source of state.sources) {
+                            const related = (result.records || []).filter(r => (r.sourceIds || []).includes(source.id)).map(r => r.id);
+                            if (related.length) tx.objectStore('sources').put({ ...source, recordIds: [...new Set([...(source.recordIds || []), ...related])] });
+                        }
+                    } catch (error) { reject(error); tx.abort(); }
+                };
+            });
+            tx.oncomplete = () => resolve(result); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || Error('日记保存中止'));
+        });
+    }
+    window.ShijianStorage = { init, getAll, get, put, snapshot, saveBatch, changeLedger, updateRecord, changeJournals };
 })();

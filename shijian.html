@@ -92,7 +92,7 @@
         .export-button { font:inherit; font-size:12px; color:#526853; border:1px solid var(--line-color); background:transparent; padding:8px; border-radius:12px; cursor:pointer; }
         .timeline-container { padding-bottom:calc(170px + env(safe-area-inset-bottom)); }
     </style>
-<link rel="stylesheet" href="/assets/app.css?v=20261026b2">
+<link rel="stylesheet" href="/assets/app.css?v=20261027s1">
 </head>
 <body>
 
@@ -126,6 +126,11 @@
         <div class="panel-header"><h3>留下此刻</h3><div class="close-btn" onclick="closeInputPanel()">✕</div></div>
         <textarea class="textarea-box" id="messageInput" aria-label="记录文字" maxlength="8000" placeholder="今晚加班到很晚，吃了一顿烧烤。"></textarea>
         <div id="draftImages" class="draft-images"></div>
+        <div class="input-options">
+            <label>这次留下什么<select id="recordIntent" aria-label="记录用途"><option value="auto">自动判断</option><option value="bill">只记账</option><option value="journal">记生活</option></select></label>
+            <label>账单放入<select id="uploadBook" aria-label="上传归属账本"></select></label>
+        </div>
+        <p class="privacy-note">账单默认仅入账本，想写成日记时再选择留下。</p>
         <label class="check-label"><input id="useAI" type="checkbox" checked><span>让AI整理文字与账单</span></label>
         <p class="privacy-note">开启后，所选文字与压缩图片会交给AI处理；原文件留在此设备。每次最多六张图片。</p>
         <div class="panel-actions">
@@ -142,14 +147,16 @@
     <!-- 模块 D：详情弹窗 -->
     <div class="detail-overlay" id="detailModal">
         <div style="display:flex; justify-content:flex-end; margin-bottom:20px;">
-            <div style="font-size:20px; color:var(--text-sub); cursor:pointer; padding:5px;" onclick="closeModal()">✕</div>
+            <button type="button" aria-label="关闭详情" style="font-size:20px; color:var(--text-sub); cursor:pointer; padding:5px; border:0; background:none;" onclick="closeModal()">✕</button>
         </div>
         <div id="modalContent"></div>
     </div>
 
-<script defer src="/assets/ledger-core.js?v=20261026b2"></script>
-<script defer src="/assets/storage.js?v=20261026b2"></script>
-<script defer src="/assets/app.js?v=20261026b2"></script>
+<script defer src="/assets/ledger-core.js?v=20261027s1"></script>
+<script defer src="/assets/storage.js?v=20261027s1"></script>
+<script defer src="/assets/journal-core.js?v=20261027s1"></script>
+<script defer src="/assets/journal-ui.js?v=20261027s1"></script>
+<script defer src="/assets/app.js?v=20261027s1"></script>
 <script>
 window.addEventListener('load', function () {
     if (!window.ShijianApp) {
