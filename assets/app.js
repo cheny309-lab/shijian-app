@@ -9,6 +9,8 @@
     const node = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
     const button = (text, fn, cls = 'quiet-button') => { const e = node('button', cls, text); e.type = 'button'; e.addEventListener('click', fn); return e; };
     const imageOK = s => typeof s === 'string' && /^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(s);
+    const Life=window.ShijianLife;
+    const Nav=window.ShijianNavigation.create({getPage:()=>S.page,setPage:page=>{S.previousPage=S.page;S.page=page;render();},blocked:()=>!S.ready||$('detailModal').classList.contains('show')||$('inputPanel').classList.contains('show')});
     const currentRecord = key => S.records.find(r => r.id === key);
     const Drafts = window.ShijianDrafts.create({DB,node,button,ready:()=>S.ready,composerValue:()=>({text:$('messageInput').value,images:S.drafts,intent:$('recordIntent').value,bookId:$('uploadBook').value,useAI:$('useAI').checked}),setComposer:draft=>{$('messageInput').value=draft.text||'';S.drafts=draft.images||[];$('recordIntent').value=draft.intent||'auto';S.intentTouched=!!draft.intent&&draft.intent!=='auto';$('uploadBook').value=books().some(b=>b.id===draft.bookId)?draft.bookId:'daily';$('useAI').checked=!!draft.useAI;renderDrafts();}});
     const Journals = window.ShijianJournals.create({ S, C, J, DB, node, button, field, input, modal, closeModal, refresh, report, toast, id, openRecord, showSource, runJournal, scheduleReflections, render, Drafts });
@@ -355,9 +357,11 @@
                         const latest = state.imports.find(i => i.id === sourceId);
                         if (!latest || latest.token !== token || latest.status === 'done') return {};
                         // 只从用户明确修正的商户归类中学习；不扩散推测的生活标签。
-                        for (const t of candidates) {
+                        for (let i=0;i<candidates.length;i++) {
+                            const t=candidates[i];
                             const pref = state.meta.find(m => m.key === 'category:' + t.merchant.trim().toLowerCase());
                             if (pref && C.CATEGORIES.includes(pref.value)) { t.category = pref.value; t.categoryTentative = false; }
+                            candidates[i]=Life.apply(t,state.meta);
                         }
                         const merged = T.ingest(state.transactions, candidates);
                         const attempts = [...(latest.attempts || []), { at: new Date().toISOString(), token, extractedCount: candidates.length, linked: merged.linked }];
@@ -466,15 +470,17 @@
             const data=C.inBook(await DB.getAll('transactions'),options.book||'all');
             const rows=[...T.groups(data),...(options.includeDeleted?T.groups(data,{includeDeleted:true}):[])].filter(g=>!options.month||g.period.startsWith(options.month)).map(g=>({...g.row,sourceIds:g.sourceIds,exportPeriod:g.period,exportApproximate:g.approximate,exportConflict:g.conflict}));
             const cell = value => '"' + String(value == null ? '' : value).replace(/^(?:\s*[=+\-@]|[\t\r])/, s => "'" + s).replace(/"/g, '""') + '"';
-            const table = [['编号', '发生时间', '来源商户', '展示简称', '细分用途', '账本', '方向', '金额', '币种', '类别', '标签', '记录状态', '已移除', '来源编号', '支付方式', '录入方式', '整理说明', '自己的感受'], ...rows.map(t => [t.id, t.exportPeriod, t.merchant, C.merchantLabel(t), t.subcategory || '', bookName(t.bookId), t.direction, t.exportConflict?'金额未定':t.amountMinor === null || !(t.currency in C.DIGITS) ? '未读清' : C.decimal(t.amountMinor, t.currency), t.currency, t.category, t.tags.join('、'), t.deleted?'已移除':'已留下', t.deleted ? '是' : '否', t.sourceIds.join(';'),t.paymentMethod||'',t.entryMethod==='text'?'手动短句':'资料识别',t.exportConflict?'冲突来源，未计入明确金额':t.exportApproximate?'相似来源按一次整理，近似项':'独立记录',t.feeling||''])];
+            const table = [['编号', '发生时间', '来源商户', '展示简称', '细分用途', '账本', '方向', '金额', '币种', '类别', '标签', '记录状态', '已移除', '来源编号', '支付方式', '录入方式', '整理说明', '自己的感受','生活大类','生活小类','场景或地点'], ...rows.map(t => [t.id, t.exportPeriod, t.merchant, C.merchantLabel(t), t.subcategory || '', bookName(t.bookId), t.direction, t.exportConflict?'金额未定':t.amountMinor === null || !(t.currency in C.DIGITS) ? '未读清' : C.decimal(t.amountMinor, t.currency), t.currency, t.category, t.tags.join('、'), t.deleted?'已移除':'已留下', t.deleted ? '是' : '否', t.sourceIds.join(';'),t.paymentMethod||'',t.entryMethod==='text'?'手动短句':'资料识别',t.exportConflict?'冲突来源，未计入明确金额':t.exportApproximate?'相似来源按一次整理，近似项':'独立记录',t.feeling||'',Life.parts(t).major,Life.parts(t).minor,Life.parts(t).scene])];
             download(new Blob(['\ufeff' + table.map(row => row.map(cell).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' }), 'shijian-bills-' + C.dayKey() + '.csv');
         } catch (error) { report(error); }
     }
     function renderMine() { Mine.render(); }
     function render() {
+        Nav.capture();
         renderTimeline(); renderBills(); renderMine();
         $('timelineContainer').hidden = S.page !== 'timeline'; $('billsPage').hidden = S.page !== 'bills'; $('minePage').hidden = S.page !== 'mine';
         document.querySelectorAll('[data-page]').forEach(e => { e.classList.toggle('active', e.dataset.page === S.page); e.setAttribute('aria-current', e.dataset.page === S.page ? 'page' : 'false'); });
+        Nav.restore(S.page);
     }
     async function recoverImports() {
         if (!S.ready) return;
@@ -485,6 +491,7 @@
         await refresh();
     }
     async function init() {
+        Nav.mount();
         $('currentMonth').textContent = new Date().getFullYear() + '年' + (new Date().getMonth() + 1) + '月';
         $('messageInput').addEventListener('input',Drafts.scheduleComposer);
         $('messageInput').addEventListener('input',previewQuickBill);
@@ -493,7 +500,7 @@
         for(const key of ['recordIntent','uploadBook','useAI'])$(key).addEventListener('change',Drafts.scheduleComposer);
         const draftStatus=node('p','muted');draftStatus.id='inputDraftStatus';$('draftImages').after(draftStatus);
         $('imageInput').addEventListener('change', onImages); $('exportButton').addEventListener('click', exportData);
-        document.querySelectorAll('[data-page]').forEach(e => e.addEventListener('click', () => { S.previousPage=S.page; S.page = e.dataset.page; render(); }));
+        document.querySelectorAll('[data-page]').forEach(e => e.addEventListener('click', () => { Nav.go(e.dataset.page); }));
         window.addEventListener('shijian-storage-closed', () => { S.ready = false; updateSaveButton(); notice('另一页面正在升级数据，请关闭其他拾间页面后刷新。'); });
         document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeInputPanel(); } });
         const viewport = window.visualViewport;

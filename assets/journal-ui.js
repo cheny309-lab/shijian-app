@@ -87,7 +87,7 @@
             };
             const save = button('保存文字', async () => {
                 save.disabled = true;
-                try { const value = await DB.updateRecord(record.id, update); await Drafts.savedEditor(record.id); revision = value.editRevision; base = { title: title.value, date: date.value, text: original.value, ai: text.value }; await refresh(); errorBox.textContent = ''; toast('已保存你的修改。'); scheduleReflections(); }
+                try { const value = await DB.updateRecord(record.id, update); await Drafts.savedEditor(record.id); revision = value.editRevision; base = { title: title.value, date: date.value, text: original.value, ai: text.value }; await refresh(); errorBox.textContent = ''; if(visible(root)) { disposeEditor(); closeModal(); } toast('已保存你的修改。'); scheduleReflections(); }
                 catch (error) { errorBox.textContent = error.message; } finally { save.disabled = false; }
             }, 'primary-button'); root.append(save);
             if (record.journalState === 'draft') {

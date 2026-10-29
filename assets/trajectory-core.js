@@ -1,6 +1,7 @@
 /* 生活轨迹的纯规则：日期精度、轻汇总、可撤销来源归并；不改写原始资料。 */
 (function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./ledger-core'));else root.TrajectoryCore=factory(root.LedgerCore);})(typeof globalThis!=='undefined'?globalThis:this,function(C){
     'use strict';
+    const Life=typeof module==='object'&&module.exports?require('./life-core'):globalThis.ShijianLife;
     const Display=typeof module==='object'&&module.exports?require('./display-core'):globalThis.ShijianDisplay;
     const clean=(x,n=200)=>C.clean(x,n),key=x=>clean(x).normalize('NFKC').replace(/\s+/g,'').toLowerCase();
     function validMonth(x){return /^\d{4}-(0[1-9]|1[0-2])$/.test(x||'')&&+x.slice(0,4)>=1900&&+x.slice(0,4)<=2200;}
@@ -40,12 +41,12 @@
     function summary(rows,month){const currencies={};let latest='',monthOnly=false,unknown=0,approximate=false;
         for(const g of groups(rows)){if(!g.period){unknown++;continue;}if(!g.period.startsWith(month))continue;if(g.period.length===7)monthOnly=true;else if(g.period>latest)latest=g.period;
             const t=g.row;if(!ready(t)||g.conflict){unknown++;continue;}approximate||=g.approximate;
-            const v=currencies[t.currency]||={income:0,expense:0,refund:0,net:0,count:0,categories:{}};
+            const v=currencies[t.currency]||={income:0,expense:0,refund:0,net:0,count:0,categories:{},subcategories:{}};
             if(['income','expense','refund'].includes(t.direction)){v[t.direction]+=t.amountMinor;if(!Number.isSafeInteger(v[t.direction]))throw Error('这些记录的金额超出了本版处理范围，请保留备份。');}
-            v.net=v.expense-v.refund;v.count++;if(t.direction==='expense')v.categories[t.category||'其他']=(v.categories[t.category||'其他']||0)+t.amountMinor;}
+            v.net=v.expense-v.refund;v.count++;if(t.direction==='expense'){const category=Life.category(Life.parts(t).major);v.categories[category]=(v.categories[category]||0)+t.amountMinor;const minor=Life.parts(t).minor;if(minor){const k=category+'／'+minor;v.subcategories[k]=(v.subcategories[k]||0)+t.amountMinor;}}}
         return {currencies,latest,monthOnly,unknown,approximate};
     }
-    function normalize(raw,sourceId,index,context={}){return {...C.normalize(raw,sourceId,index),trajectoryVersion:1,amountEstimated:raw?.verified?.amount===false,documentKind:context.documentKind||'bill',...(context.feeling&&context.feeling.length>8&&!/^(只记账|仅记账|识别|请识别)/.test(context.feeling)?{feeling:context.feeling.slice(0,2000)}:{}),aiAllowed:context.aiAllowed!==false};}
+    function normalize(raw,sourceId,index,context={}){return {...Life.prepare(raw,C.normalize(raw,sourceId,index)),trajectoryVersion:1,amountEstimated:raw?.verified?.amount===false,documentKind:context.documentKind||'bill',...(context.feeling&&context.feeling.length>8&&!/^(只记账|仅记账|识别|请识别)/.test(context.feeling)?{feeling:context.feeling.slice(0,2000)}:{}),aiAllowed:context.aiAllowed!==false};}
     function edit(t,changes,at=new Date().toISOString()){return C.edit(t,{...changes,trajectoryVersion:1,updatedAt:at},'用户修改生活轨迹');}
     function assign(t,value,at=new Date().toISOString()){if(value&&!validMonth(value)&&!/^\d{4}-\d{2}-\d{2}$/.test(value)||value&&value.length===10&&!C.date(value))throw Error('选一个有效的日期或月份，也可以留空。');return edit(t,{dateAssigned:true,trajectoryDate:value,dateOrigin:'user',dateBeforeAssignment:{dateAssigned:!!t.dateAssigned,trajectoryDate:t.trajectoryDate||'',dateOrigin:t.dateOrigin||''}},at);}
     function label(p){return p?.length===10?`${+p.slice(5,7)}月${+p.slice(8)}日`:validMonth(p)?`${+p.slice(5)}月 · 日期未注明`:'发生日期未注明';}

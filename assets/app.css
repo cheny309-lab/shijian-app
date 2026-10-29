@@ -148,3 +148,29 @@ select,input { font-size:16px; padding:10px 12px; border:1px solid #e1e1d9; bord
 .trajectory-date-relative,.trajectory-date-coarse{font-size:13px;white-space:nowrap;color:#819078}
 .trajectory-month-note{font-size:11px;color:#8b9384;margin:8px 0 4px;line-height:1.6}
 .trajectory-detail-line>span:last-child{max-width:72%;overflow-wrap:anywhere;text-align:right}
+
+/* 生活语言与导航：不阻止纵向阅读、缩放或浏览器边缘返回。 */
+#timelineContainer,#billsPage,#minePage{touch-action:pan-y pinch-zoom}
+.life-field{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+.life-field input,.life-field select{width:100%;min-width:0}
+.trajectory-day{margin-top:22px}.trajectory-date{color:#65725f}
+.trajectory-heading .trajectory-edit-name{max-width:none;flex:0 1 auto;font-size:16px}
+
+/* 日常成篇：日期与城市在上，事件和感受在中，数字由用户主动展开。 */
+.story-day{grid-template-columns:10px minmax(0,1fr);gap:14px 12px;margin:28px 0 38px}
+.story-day-header{grid-column:1/-1;display:flex;align-items:baseline;gap:12px;min-width:0;padding:0!important;white-space:normal}
+.story-day-title,.story-city{border:0;background:none;font:inherit;cursor:pointer;padding:8px 0;margin:0;text-align:left;min-height:44px}
+.story-day-title{font-size:18px;font-weight:550;color:#343c32;flex-shrink:0}
+.story-city{font-size:13px;color:#707b6c;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.story-day>.trajectory-line{grid-column:1}.story-day>.trajectory-content{grid-column:2;min-width:0}
+.story-day .trajectory-node{padding:12px 0 18px;border-bottom:0;margin:0 0 7px}
+.story-day .trajectory-heading{align-items:baseline;gap:12px}
+.story-day .trajectory-edit-name{font-size:16px;font-weight:500;color:#344131}
+.story-day .trajectory-edit-amount{font-size:13px;font-weight:400;color:#6d7668}
+.story-day .trajectory-feeling{font-size:14px;line-height:1.8;color:#687262;margin:2px 0 8px}
+.story-day-summary{margin:8px 0 2px;padding-top:10px;border-top:1px solid #e5e8df;font-size:13px;color:#687462}
+.story-day-summary>summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:7px;font-size:12px;color:#6c7865;list-style:none}
+.story-day-summary>summary::-webkit-details-marker{display:none}.story-day-summary>summary::after{content:'⌄';font-size:13px}.story-day-summary[open]>summary::after{content:'⌃'}
+.story-day-summary .muted{font-size:12px;margin:5px 0}.story-summary-note{font-size:11px;line-height:1.7;color:#7a8273;margin:8px 0}
+.story-overview{padding:0 0 14px!important;margin-bottom:0!important;border:0!important}.story-overview>.muted{margin:0 0 3px}
+@media(max-width:350px){.story-day{grid-template-columns:8px minmax(0,1fr);column-gap:9px}.story-day .trajectory-edit-name{font-size:15px}.story-day .trajectory-heading{gap:7px}.story-day .trajectory-edit-amount{font-size:12px}}
