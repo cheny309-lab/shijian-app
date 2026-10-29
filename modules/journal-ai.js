@@ -8,7 +8,7 @@ async function generateJournal({client,config,message,signal,extractContent}){
  const content=extractContent(response.data);let data;try{data=JSON.parse(content.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,''));}catch{if(content.trim().startsWith('{')){const e=Error('这次文字暂时没有整理完整，原始记录仍在。');e.code='AI_INVALID_JSON';throw e;}data={text:content};}
  const text=typeof data.text==='string'?data.text.trim().slice(0,1000):'';
  if(!text){const e=Error('文字暂时没有整理出来，原始记录仍在。');e.code='AI_EMPTY_RESULT';throw e;}
- const title=typeof data.title==='string'?data.title.trim().replace(/[\r\n]/g,'').slice(0,24):'';
- return {title:!title||J.isPlaceholder(title)?J.suggestTitle(text):title,text};
+ const title=typeof data.title==='string'?data.title.trim().replace(/[\r\n]/g,''):'';
+ return {title:!title||J.isPlaceholder(title)?J.suggestTitle(text):require('../assets/display-core').photoTitle(title,text),text};
 }
 module.exports={generateJournal,PROMPT};
