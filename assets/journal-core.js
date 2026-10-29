@@ -7,9 +7,10 @@
     const T = typeof module==='object'&&module.exports?require('./trajectory-core'):globalThis.TrajectoryCore;
     const day = r => C.date(r.displayDate) ? r.displayDate.slice(0, 10) : C.dayKey(r.time);
     const isPlaceholder=s=>['一张生活切片','生活切片','时光切片','图片','今日记录','这一刻','生活记录','今日时光','图片记忆'].includes(String(s||'').trim());
-    function suggestTitle(text){const s=String(text||'').replace(/<[^>]*>/g,'').replace(/[\r\n]+/g,' ').trim();if(!s)return '';const first=s.split(/[。！？!?]/)[0].replace(/^[“\"「]|[”\"」]$/g,'').trim();return first.slice(0,16);}
+    const Display=typeof module==='object'&&module.exports?require('./display-core'):globalThis.ShijianDisplay;
+    const suggestTitle=text=>Display.photoTitle(text);
     const hasOwnTitle=r=>r.titleUser===true||r.titleUser!==false&&r.title!==undefined&&(!isPlaceholder(r.title)||(r.journalHistory||[]).some(h=>h.before&&h.after&&h.before.title!==h.after.title));
-    const title = r => hasOwnTitle(r) ? r.title : r.autoTitle || (!r.receipt&&r.image?suggestTitle(r.ai||r.text):'') || (r.text||'').split('\n')[0].slice(0,20) || (r.image?'图片记忆 · '+day(r).slice(5).replace('-','月')+'日':'这一刻');
+    const title = r => hasOwnTitle(r) ? r.title : (r.autoTitle?Display.photoTitle(r.autoTitle,r.ai||r.text):'') || (!r.receipt&&r.image?suggestTitle(r.ai||r.text):'') || (r.text||'').split('\n')[0].slice(0,20) || (r.image?'图片记忆 · '+day(r).slice(5).replace('-','月')+'日':'这一刻');
     const body = r => r.journalEdited ? r.ai || '' : r.ai || r.text || '';
     const linked = (r, t) => Array.isArray(r.transactionIds) ? r.transactionIds.includes(t.id) : (r.sourceIds || []).some(s => (t.sourceIds || []).includes(s));
     const active = r => !r.journalDeleted && r.journalState !== 'draft' && C.onTimeline(r);

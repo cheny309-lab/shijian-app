@@ -27,14 +27,14 @@
             root.append(node('p','detail-text','反馈只上传你预览后提交的文字、截图、联系方式和限定诊断信息。接收端保留必要的处理记录；删除本机历史不等于删除后台副本。服务端可能产生必要的网络访问与错误日志，不记录生活正文到应用日志。'));
             try{const r=await fetch('/api/feedback/config'),c=await r.json();root.append(node('p','muted','维护者：'+(c.operator||'尚未配置')+'\n联系方式：'+(c.contact||'尚未配置')+'\n反馈保存期限：'+c.retentionDays+'天\n服务器区域：'+(c.region||'尚未配置；请维护者核对实际部署区域后开放反馈')));}catch(_){root.append(node('p','muted','维护者信息暂时未能读取，请稍后查看。'));}
         }else if(which==='terms')root.append(node('p','detail-text','无需注册即可使用本机记录。请只提交有权处理的资料，妥善保存备份。账单识别和生成文字可能有误，可随时核对与修改；不将生成内容当作专业财务、医疗或其他专业意见。功能、数据处理及保存边界以实际界面和数据说明为准。'),node('p','muted','这是试用版使用说明，不以模板协议宣称尚未提供的账号、加密或云同步服务。'));
-        else if(which==='changes')root.append(node('p','detail-text','2026年10月29日 · V0.4.0\n账单改为生活轨迹；名称和金额可直接点改；无日期片段自然安放；消费移除可恢复；图片按内容命名。\n\n2026年10月28日 · V0.3.1\n沿用拾间图标，增加桌面添加指引；简单消费短句可本地入账，原话留存，不必上传截图。\n\n2026年10月27日 · V0.3.0\n完善“我的”、备份恢复、草稿、本机反馈回执与私密反馈接收。\n\nV0.2.0\n增加日记修改、最近删除、账单日记草稿选择。'));
+        else if(which==='changes')root.append(node('p','detail-text','2026年10月29日 · V0.4.1\n轨迹名称短展示、单行省略；日期完整标签；时光照片默认只记生活；去掉常驻轨迹引导；图片标题不再截半句。\n\n2026年10月29日 · V0.4.0\n账单改为生活轨迹；名称和金额可直接点改；无日期片段自然安放；消费移除可恢复；图片按内容命名。\n\n2026年10月28日 · V0.3.1\n沿用拾间图标，增加桌面添加指引；简单消费短句可本地入账，原话留存，不必上传截图。\n\n2026年10月27日 · V0.3.0\n完善“我的”、备份恢复、草稿、本机反馈回执与私密反馈接收。\n\nV0.2.0\n增加日记修改、最近删除、账单日记草稿选择。'));
         else root.append(node('p','detail-text','拾间\n记账，记生活；懂事，也懂你。\n\n从随手留下的账单、照片和文字中，整理属于自己的生活。\n\n没有被记录的时间，也可以安心留白。这里不要求你坚持，不评判花费，只让你想留住的片段，有地方安放。'));
     }
     function render(){const root=document.getElementById('minePage');root.replaceChildren();
         const hero=node('section','mine-hero'),name=button(meta('nickname')||'拾间客',()=>{const box=modal('怎样称呼你'),input=node('input');input.maxLength=20;input.value=meta('nickname')||'';input.setAttribute('aria-label','我的昵称');input.placeholder='拾间客';box.append(input,button('留下这个称呼',async()=>{try{await toggle('nickname',input.value.trim().slice(0,20));toast('称呼已留在此浏览器。');}catch(e){report(e);}},'primary-button'));},'nickname');
         hero.append(node('span','sage-dot'),name);root.append(hero,node('p','mine-slogan','记账，记生活；懂事，也懂你。'));
         const confirmed=window.TrajectoryCore.groups(S.transactions).length,reviews=0;
-        root.append(node('p','mine-counts',!S.records.some(C.onTimeline)&&!confirmed?'这里，留给你慢慢留下的生活。':`这里留着 ${S.records.filter(C.onTimeline).length} 篇时光切片，${confirmed} 笔账单记录。`));if(reviews)root.append(node('p','muted',`另有 ${reviews} 笔待核对。`));
+        root.append(node('p','mine-counts',!S.records.some(C.onTimeline)&&!confirmed?'这里，留给你慢慢留下的生活。':`这里留着 ${S.records.filter(C.onTimeline).length} 篇时光切片，${confirmed} 笔生活足迹。`));if(reviews)root.append(node('p','muted',`另有 ${reviews} 笔待核对。`));
         const state=node('section','local-state');state.append(node('strong','','保存在此浏览器 · 本机保存模式'),node('p','muted','这是拾间现阶段的保存方式，无需额外设置。换设备或换浏览器不会自动同步；清除网站数据或浏览器回收存储可能导致记录丢失。你可以导出一份完整备份。'));
         const future=node('details');future.append(node('summary','','未来的数据保存'),node('p','muted','云同步已列入后续计划；如上线，你可以自愿选择开启。现有记录不会自动上传。'));state.append(future);root.append(state);
         const entry=section(root,'随手打开');entry.append(button(Desktop.standalone()?'桌面使用与记录迁移':'把拾间放到桌面',Desktop.open,'mine-link'));

@@ -1,6 +1,7 @@
 /* 生活轨迹的纯规则：日期精度、轻汇总、可撤销来源归并；不改写原始资料。 */
 (function(root,factory){if(typeof module==='object'&&module.exports)module.exports=factory(require('./ledger-core'));else root.TrajectoryCore=factory(root.LedgerCore);})(typeof globalThis!=='undefined'?globalThis:this,function(C){
     'use strict';
+    const Display=typeof module==='object'&&module.exports?require('./display-core'):globalThis.ShijianDisplay;
     const clean=(x,n=200)=>C.clean(x,n),key=x=>clean(x).normalize('NFKC').replace(/\s+/g,'').toLowerCase();
     function validMonth(x){return /^\d{4}-(0[1-9]|1[0-2])$/.test(x||'')&&+x.slice(0,4)>=1900&&+x.slice(0,4)<=2200;}
     function parsePeriod(value){
@@ -15,7 +16,7 @@
     }
     function period(t){if(t.dateAssigned===true)return C.date(t.trajectoryDate)?t.trajectoryDate.slice(0,10):validMonth(t.trajectoryDate)?t.trajectoryDate:'';if(C.date(t.occurredAt))return t.occurredAt.slice(0,10);return parsePeriod(t.evidence?.date||'')||parsePeriod(t.occurredAt)||parsePeriod(t.merchant);}
     function ready(t){return !['pending','closed'].includes(t.paymentState)&&(!((t.reasons||[]).includes('金额与来源摘录不一致'))||t.moneyUser===true||t.confirmation==='user')&&Number.isSafeInteger(t.amountMinor)&&t.amountMinor>=0&&t.currency in C.DIGITS&&['income','expense','refund','transfer'].includes(t.direction)&&(t.paymentState==='paid'||t.documentKind==='bill'&&t.paymentState==='unknown'||t.confirmation==='user'||t.entryMethod==='text');}
-    function title(t){return clean(t.correctedMerchant||t.displayName||t.merchant,60)||'一笔生活记录';}
+    function title(t){return Display.merchant(t);}
     function sameFields(a,b){return a.amountMinor===b.amountMinor&&a.currency===b.currency&&a.direction===b.direction&&period(a)===period(b);}
     function weak(a,b){
         if(a.keepSeparate||b.keepSeparate||!sameFields(a,b)||!period(a)||!ready(a)||!ready(b)||key(a.merchant)!==key(b.merchant)||!key(a.merchant))return false;

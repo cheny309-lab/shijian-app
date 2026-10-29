@@ -141,3 +141,10 @@ select,input { font-size:16px; padding:10px 12px; border:1px solid #e1e1d9; bord
 @media(max-width:350px){.trajectory-day{grid-template-columns:35px 10px minmax(0,1fr);column-gap:5px}.trajectory-edit-name{font-size:16px}.trajectory-edit-amount{font-size:14px}.trajectory-overview-line{font-size:14px}}
 
 .trajectory-photo{display:block;width:88px;height:88px;object-fit:cover;border-radius:9px;margin:9px 0;cursor:pointer}.trajectory-recent input{font:inherit;width:100%;max-width:100%;border:1px solid #dfe5d8;border-radius:9px;padding:10px;margin:0 0 12px;background:#f8f9f5}
+
+/* V0.4.1：短名称与完整日期标签，仅影响展示。 */
+.trajectory-edit-name{flex:0 1 auto;min-width:0;max-width:68%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trajectory-edit-amount{flex:0 0 auto}
+.trajectory-date-relative,.trajectory-date-coarse{font-size:13px;white-space:nowrap;color:#819078}
+.trajectory-month-note{font-size:11px;color:#8b9384;margin:8px 0 4px;line-height:1.6}
+.trajectory-detail-line>span:last-child{max-width:72%;overflow-wrap:anywhere;text-align:right}

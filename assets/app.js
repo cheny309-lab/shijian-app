@@ -10,7 +10,7 @@
     const button = (text, fn, cls = 'quiet-button') => { const e = node('button', cls, text); e.type = 'button'; e.addEventListener('click', fn); return e; };
     const imageOK = s => typeof s === 'string' && /^data:image\/(jpeg|jpg|png|webp|gif);base64,/i.test(s);
     const currentRecord = key => S.records.find(r => r.id === key);
-    const Drafts = window.ShijianDrafts.create({DB,node,button,ready:()=>S.ready,composerValue:()=>({text:$('messageInput').value,images:S.drafts,intent:$('recordIntent').value,bookId:$('uploadBook').value,useAI:$('useAI').checked}),setComposer:draft=>{$('messageInput').value=draft.text||'';S.drafts=draft.images||[];$('recordIntent').value=draft.intent||'auto';$('uploadBook').value=books().some(b=>b.id===draft.bookId)?draft.bookId:'daily';$('useAI').checked=!!draft.useAI;renderDrafts();}});
+    const Drafts = window.ShijianDrafts.create({DB,node,button,ready:()=>S.ready,composerValue:()=>({text:$('messageInput').value,images:S.drafts,intent:$('recordIntent').value,bookId:$('uploadBook').value,useAI:$('useAI').checked}),setComposer:draft=>{$('messageInput').value=draft.text||'';S.drafts=draft.images||[];$('recordIntent').value=draft.intent||'auto';S.intentTouched=!!draft.intent&&draft.intent!=='auto';$('uploadBook').value=books().some(b=>b.id===draft.bookId)?draft.bookId:'daily';$('useAI').checked=!!draft.useAI;renderDrafts();}});
     const Journals = window.ShijianJournals.create({ S, C, J, DB, node, button, field, input, modal, closeModal, refresh, report, toast, id, openRecord, showSource, runJournal, scheduleReflections, render, Drafts });
     const Trajectories=window.ShijianTrajectories.create({S,C,T,J,DB,node,button,modal,closeModal,refresh,report,toast,amount,Journals,books,bookName,openRecord,showSource,placeRecord,runBills,renderReflections,manageBooks,moveToBook,exportCSV,scheduleReflections});
     const Mine = window.ShijianMine.create({S,C,J,DB,node,button,modal,closeModal,toast,report,refresh,download,books,exportCSV,Journals,Trajectories,Drafts,openRecord,resumeComposer:async targetId=>{await openInputPanel(targetId);},getErrorCode:()=>S.lastErrorCode||'',preferencesChanged:()=>{$('useAI').checked=S.autoAI;scheduleReflections();}});
@@ -149,6 +149,7 @@
             const prepared = [];
             for (const file of files) prepared.push(await prepare(file));
             for (const draft of prepared) if (!S.drafts.some(d => d.id === draft.id)) S.drafts.push(draft);
+            if(S.page==='timeline'&&!S.intentTouched&&$('recordIntent').value==='auto')$('recordIntent').value=/^(?:请)?(?:只记账|仅记账|只留轨迹|仅留轨迹)/.test($('messageInput').value.trim())?'bill':'journal';
             renderDrafts(); Drafts.scheduleComposer();
         } catch (error) { report(error); }
         finally { S.imageLoading = false; updateSaveButton(); }
@@ -156,6 +157,7 @@
     async function openInputPanel(targetId) {
         if(S.resuming)return;
         fillUploadBook();
+        if(!$('messageInput').value.trim()&&!S.drafts.length){S.intentTouched=false;$('recordIntent').value=S.page==='bills'?'bill':'auto';}
         $('inputPanel').classList.add('show'); $('inputOverlay').classList.add('show');
         $('inputPanel').setAttribute('aria-hidden', 'false'); document.body.classList.add('panel-open');
         S.resuming=true;const controls=[$('messageInput'),$('imageInput'),$('recordIntent'),$('uploadBook'),$('useAI')];controls.forEach(e=>e.disabled=true);updateSaveButton();
@@ -199,7 +201,7 @@
             if (useAI) {
                 // 消费只自动进入轨迹，不主动弹日记选择。
                 records.filter(C.onTimeline).forEach(record => { void runJournal(record.id); });
-                for (const source of sources) if (intent === 'bill' || source.preview || /[¥￥$元]|支出|收入|花了|付款|退款/.test(source.text)) void runBills(source.id);
+                for (const source of sources) if (intent!=='journal' && (intent === 'bill' || source.preview || /[¥￥$元]|支出|收入|花了|付款|退款/.test(source.text))) void runBills(source.id);
             }
         } catch (error) { notice('本次保存未完成，输入仍保留。请检查设备存储并导出已有记录。'); report(error); }
         finally { S.saving = false; Drafts.unpause(); updateSaveButton(); }
@@ -235,10 +237,8 @@
     function renderTimeline() {
         const root = $('timelineContainer'); root.replaceChildren();
         const grouped = new Map();
-        const materials = S.records.filter(r => !r.journalDeleted && r.journalState !== 'draft' && (r.placement === 'pending' || r.placement === 'bills'));
         const drafts = S.records.filter(r => !r.journalDeleted && r.journalState === 'draft');
         if (drafts.length) root.append(button(`${drafts.length} 篇日记草稿，想看时再打开`, Journals.drafts, 'material-link'));
-        if (materials.length) root.append(button('看看生活轨迹', () => { S.page = 'bills'; render(); }, 'material-link'));
         [...S.records].filter(C.onTimeline).sort((a, b) => J.day(b).localeCompare(J.day(a)) || b.time.localeCompare(a.time) || b.id.localeCompare(a.id)).forEach(r => { const d = J.day(r); if (!grouped.has(d)) grouped.set(d, []); grouped.get(d).push(r); });
         if (!grouped.size) { root.append(node('p', 'empty-state', '这里，留给你想记住的日常。')); return; }
         for (const [day, records] of grouped) {
@@ -364,7 +364,7 @@
                         return { transactions: merged.transactions, imports: [{ id: sourceId, status: 'done', documentKind: C.documentKind(data), finishedAt: new Date().toISOString(), totals: data.totals, warnings, extractedCount: candidates.length, linked: merged.linked, attempts }] };
                     });
                     await routeSource(sourceId, C.documentKind(data));
-                    toast(candidates.length ? `已留下 ${candidates.length} 段日常。` : data.totals.length ? '已留下期间汇总，不与明细重复相加。' : '这份生活记录没有识别到交易。');
+                    if(candidates.length)toast('已留在轨迹，随时回看。');else if(data.totals.length)toast('这份记录已留下。');
                 } catch (error) {
                     await DB.changeLedger(state => {
                         const latest = state.imports.find(i => i.id === sourceId);
@@ -488,7 +488,7 @@
         $('currentMonth').textContent = new Date().getFullYear() + '年' + (new Date().getMonth() + 1) + '月';
         $('messageInput').addEventListener('input',Drafts.scheduleComposer);
         $('messageInput').addEventListener('input',previewQuickBill);
-        $('recordIntent').addEventListener('change',previewQuickBill);
+        $('recordIntent').addEventListener('change',()=>{S.intentTouched=true;previewQuickBill();});
         $('useAI').addEventListener('change',previewQuickBill);
         for(const key of ['recordIntent','uploadBook','useAI'])$(key).addEventListener('change',Drafts.scheduleComposer);
         const draftStatus=node('p','muted');draftStatus.id='inputDraftStatus';$('draftImages').after(draftStatus);

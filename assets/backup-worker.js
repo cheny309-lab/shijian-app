@@ -1,5 +1,5 @@
 'use strict';
-importScripts('/assets/ledger-core.js','/assets/trajectory-core.js','/assets/backup-core.js');
+importScripts('/assets/ledger-core.js','/assets/display-core.js','/assets/trajectory-core.js','/assets/backup-core.js');
 let incoming;
 function readLocal(){return new Promise((resolve,reject)=>{const req=indexedDB.open('shijian_records_v2');req.onerror=()=>reject(req.error);req.onsuccess=()=>{const db=req.result,data={};let tx;try{tx=db.transaction(ShijianBackup.TABLES,'readonly');for(const name of ShijianBackup.TABLES){const r=tx.objectStore(name).getAll();r.onsuccess=()=>{data[name]=r.result;};}tx.oncomplete=()=>{db.close();resolve(data);};tx.onerror=()=>{db.close();reject(tx.error);};}catch(e){db.close();reject(e);}};});}
 self.onmessage=async event=>{
