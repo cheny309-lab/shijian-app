@@ -112,7 +112,7 @@
         return new Promise((resolve, reject) => {
             const tx = db.transaction(['records', 'sources', 'meta', 'drafts', ...(quickTransaction ? ['transactions','imports'] : [])], 'readwrite');
             let quickResult;
-            if(quickTransaction){const req=tx.objectStore('transactions').getAll();req.onsuccess=()=>{try{const merged=window.LedgerCore.ingest(req.result,[quickTransaction]);merged.transactions.forEach(row=>tx.objectStore('transactions').put(row));quickResult=merged.transactions.find(row=>row.id===quickTransaction.id);tx.objectStore('imports').put({id:quickTransaction.sourceIds[0],status:'done',documentKind:'bill',entryMethod:'text',finishedAt:new Date().toISOString(),extractedCount:1,totals:[],warnings:[],linked:merged.linked});}catch(e){reject(e);tx.abort();}};}
+            if(quickTransaction){const req=tx.objectStore('transactions').getAll();req.onsuccess=()=>{try{const merged=(window.TrajectoryCore||window.LedgerCore).ingest(req.result,[quickTransaction]);merged.transactions.forEach(row=>tx.objectStore('transactions').put(row));quickResult=merged.transactions.find(row=>row.id===quickTransaction.id);tx.objectStore('imports').put({id:quickTransaction.sourceIds[0],status:'done',documentKind:'bill',entryMethod:'text',finishedAt:new Date().toISOString(),extractedCount:1,totals:[],warnings:[],linked:merged.linked});}catch(e){reject(e);tx.abort();}};}
             bump(tx); if(draftId) tx.objectStore('drafts').delete(draftId);
             records.forEach(record => tx.objectStore('records').put(record));
             sources.forEach(source => {
@@ -157,6 +157,7 @@
         });
     }
     const updateRecord=(id,transform,expectedEpoch)=>updateEntry('records',id,transform,expectedEpoch);
+    const updateSource=(id,transform)=>updateEntry('sources',id,transform);
     const updateReflection=(id,transform,expectedEpoch)=>updateEntry('reflections',id,transform,expectedEpoch,true);
     // 日记草稿、发布、恢复按同一快照校验；并发标签页也不能重复发布同一笔交易。
     function changeJournals(transform) {
@@ -213,5 +214,5 @@
         tx.oncomplete=resolve;tx.onabort=()=>reject(error||tx.error);tx.onerror=()=>reject(error||tx.error);
     });}
     function recoveryInfo(){return request('recoveries','readonly',s=>s.get('before-last-import'));}
-    window.ShijianStorage = { init, getAll, get, put, snapshot, saveBatch, changeLedger, updateRecord, updateReflection, changeJournals, remove, restoreBackup, recoveryInfo, undoBackup };
+    window.ShijianStorage = { init, getAll, get, put, snapshot, saveBatch, changeLedger, updateRecord, updateSource, updateReflection, changeJournals, remove, restoreBackup, recoveryInfo, undoBackup };
 })();

@@ -106,3 +106,38 @@ select,input { font-size:16px; padding:10px 12px; border:1px solid #e1e1d9; bord
 @media (display-mode:standalone) { .header { padding-top:calc(20px + env(safe-area-inset-top)); } }
 
 .mine-slogan { color:#7d8b79; font-size:13px; letter-spacing:.04em; margin:-4px 0 18px; line-height:1.8; }
+
+/* 生活轨迹：轻概览、日分组、直接编辑；沿用原有米白与鼠尾草绿。 */
+.trajectory-intro,.trajectory-caption{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.trajectory-intro select{max-width:65%;border:0;background:transparent;padding:8px 0;color:#68715f;font:inherit}
+.trajectory-caption h2{font-family:serif;font-size:24px;font-weight:500;margin:18px 0 8px}
+.trajectory-overview{padding:4px 0 12px;margin-bottom:4px;border-bottom:1px solid #e5e7df}
+.trajectory-overview-line{display:flex;gap:16px;flex-wrap:wrap;font-size:16px;line-height:1.8;margin:6px 0}
+.trajectory-overview .muted{margin:5px 0;font-size:13px}
+.trajectory-related{font:inherit;font-size:12px;color:#70876f;background:none;border:0;padding:8px 0;text-align:left;min-height:36px}
+.trajectory-edit-hint{font-size:12px;color:#7a8275;margin:12px 0 22px;line-height:1.7}
+.trajectory-day{display:grid;grid-template-columns:45px 14px minmax(0,1fr);column-gap:8px;min-height:85px}
+.trajectory-date{font-size:17px;font-weight:400;padding-top:9px;white-space:pre-line;color:#65725f;line-height:1.7}
+.trajectory-date strong{font-weight:400}
+.trajectory-line{position:relative;display:flex;justify-content:center}
+.trajectory-line:after{position:absolute;content:'';width:1px;background:#dfe6da;top:16px;bottom:-16px}
+.trajectory-dot{position:relative;z-index:1;width:6px;height:6px;background:#91a68d;border-radius:100%;margin-top:19px}
+.trajectory-content{min-width:0;padding-bottom:24px}
+.trajectory-node.bill-row,.trajectory-node{display:block;width:100%;background:none;border:0;border-bottom:1px solid #eceee5;border-radius:0;padding:0 0 14px;margin:0 0 12px;text-align:left;cursor:pointer}
+.trajectory-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;min-width:0}
+.trajectory-edit-name,.trajectory-edit-amount{font:inherit;background:none;border:0;min-height:44px;padding:8px 0;text-align:left;line-height:1.6;color:#364231;touch-action:manipulation}
+.trajectory-edit-name{font-size:17px;overflow-wrap:anywhere;min-width:44px;max-width:68%}
+.trajectory-edit-amount{font-size:15px;min-width:44px;text-align:right;white-space:nowrap;color:#68775f}
+.trajectory-edit-name:focus-visible,.trajectory-edit-amount:focus-visible{outline:2px solid #8da38e;outline-offset:3px;border-radius:4px}
+.trajectory-feeling{font-size:14px;color:#737b6e;line-height:1.9;margin:2px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.trajectory-recent{margin:22px 0;padding:15px;background:#eef0e8;border-radius:12px}
+.trajectory-recent>summary{font-size:14px;color:#62725d;cursor:pointer;min-height:30px}
+.trajectory-recent>.muted{font-size:12px;line-height:1.8;margin-bottom:18px}
+.trajectory-recent .trajectory-node:last-child{margin-bottom:0}
+.trajectory-detail-money{font-size:24px;color:#607159;line-height:1.8;margin:8px 0}
+.trajectory-detail-line{display:flex;justify-content:space-between;gap:12px;line-height:1.8}
+.trajectory-remove{color:#8b8071!important}
+#toast:has(.toast-undo){pointer-events:auto}.toast-undo{margin-left:10px;color:#fff;text-decoration:underline;background:none;border:0;font:inherit;padding:8px}
+@media(max-width:350px){.trajectory-day{grid-template-columns:35px 10px minmax(0,1fr);column-gap:5px}.trajectory-edit-name{font-size:16px}.trajectory-edit-amount{font-size:14px}.trajectory-overview-line{font-size:14px}}
+
+.trajectory-photo{display:block;width:88px;height:88px;object-fit:cover;border-radius:9px;margin:9px 0;cursor:pointer}.trajectory-recent input{font:inherit;width:100%;max-width:100%;border:1px solid #dfe5d8;border-radius:9px;padding:10px;margin:0 0 12px;background:#f8f9f5}

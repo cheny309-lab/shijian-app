@@ -161,7 +161,7 @@
             fold.disabled = split.disabled = !available.length;
             root.append(fold, split, button('只存入生活账本', () => { closeModal(); toast('已留在账本，时光轴保持原样。'); }, 'choice-option'));
         }
-        function offer(sourceId) {
+        function offer(sourceId) { return; /* 主动选择才生成日记。 */
             if (!offers.has(sourceId)) return;
             offers.delete(sourceId);
             if (document.hidden || S.page !== 'timeline' || document.getElementById('detailModal').classList.contains('show') || document.getElementById('inputPanel').classList.contains('show')) return;

@@ -5,7 +5,7 @@
     else root.LedgerCore = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
     'use strict';
-    const VERSION = '2026.10.28-desktop-v0.3.1';
+    const VERSION = '2026.10.29-trajectory-v0.4.0';
     const CATEGORIES = ['餐饮', '出行', '居家', '购物', '健康', '学习', '休闲', '生活服务', '其他'];
     const DIGITS = { CNY: 2, USD: 2, HKD: 2, EUR: 2, GBP: 2, SGD: 2, AUD: 2, CAD: 2, JPY: 0, TWD: 2, KRW: 0 };
     const clean = (value, max = 200) => typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -33,8 +33,9 @@
         if (record.placementUser) return { ...record, receipt: kind === 'bill' };
         let placement = record.placement;
         if (record.intent === 'bill') placement = 'bills';
-        else if (record.intent === 'journal' || !record.image) placement = 'journal';
-        else if (kind === 'bill') placement = record.hasNarrative ? 'journal' : 'bills';
+        else if (record.intent === 'journal') placement = 'journal';
+        else if (kind === 'bill') placement = 'bills';
+        else if (!record.image) placement = 'journal';
         else placement = kind === 'life' ? 'journal' : 'pending';
         return { ...record, placement, receipt: kind === 'bill', aiStatus: placement === 'journal' ? record.aiStatus : 'idle' };
     }

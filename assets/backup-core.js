@@ -43,7 +43,7 @@
                 return { $asset:assetId };
             }
             if (Array.isArray(value)) { const out=[]; for (const v of value) out.push(await walk(v)); return out; }
-            if (value && typeof value==='object') { const out={}; for (const [k,v] of Object.entries(value)) { if (badKeys.has(k)) fail('BACKUP_KEYS','资料中有暂不支持的字段。'); if(['queryToken','accessToken','apiKey','adminToken','session_key','token'].includes(k))continue; out[k]=await walk(v); } return out; }
+            if (value && typeof value==='object') { const out={}; for (const [k,v] of Object.entries(value)) { if (badKeys.has(k)) fail('BACKUP_KEYS','资料中有暂不支持的字段。'); if(['queryToken','accessToken','apiKey','adminToken','session_key','token'].includes(k))continue; if(v!==undefined)out[k]=await walk(v); } return out; }
             return value;
         }
         const data={};
@@ -149,7 +149,7 @@
         }
         for(const table of TABLES) for(const raw of incoming.data[table]) {
             const row=normalize(table,raw), k=key(table,row), ref=table+':'+k, old=(local[table]||[]).find(r=>key(table,r)===k);
-            if(table==='meta'&&(k==='autoAI'||['hideAmounts','nickname'].includes(k)&&!preferences)) {skipped.push(ref);continue;}
+            if(table==='meta'&&(k==='autoAI'||['hideAmounts','nickname','defaultCurrency'].includes(k)&&!preferences)) {skipped.push(ref);continue;}
             if(table==='transactions'&&txMap.has(k)) {
                 const oldTx=local.transactions.find(t=>t.id===txMap.get(k));
                 changes.transactions.push({...oldTx,sourceIds:[...new Set([...oldTx.sourceIds,...row.sourceIds])]}); skipped.push(ref);continue;
