@@ -100,7 +100,7 @@
         .export-button { font:inherit; font-size:12px; color:#526853; border:1px solid var(--line-color); background:transparent; padding:8px; border-radius:12px; cursor:pointer; }
         .timeline-container { padding-bottom:calc(170px + env(safe-area-inset-bottom)); }
     </style>
-<link rel="stylesheet" href="/assets/app.css?v=20261028d1">
+<link rel="stylesheet" href="/assets/app.css?v=20261029s1">
 </head>
 <body>
 
@@ -123,7 +123,7 @@
         </div>
         <div class="bottom-nav">
             <button type="button" class="nav-item active" data-page="timeline"><span class="icon-home"></span>时光</button>
-            <button type="button" class="nav-item" data-page="bills"><span class="icon-list"></span>账单</button>
+            <button type="button" class="nav-item" data-page="bills"><span class="icon-list"></span>轨迹</button>
             <button type="button" class="nav-item" data-page="mine"><span class="icon-user"></span>我的</button>
         </div>
     </div>
@@ -137,10 +137,10 @@
         <p class="privacy-note">截图适合已有凭证和批量输入，一句话适合简单单笔。拾间提供便利，怎样留下，由你决定。</p>
         <div id="draftImages" class="draft-images"></div>
         <div class="input-options">
-            <label>这次留下什么<select id="recordIntent" aria-label="记录用途"><option value="auto">自动判断</option><option value="bill">只记账</option><option value="journal">记生活</option></select></label>
-            <label>账单放入<select id="uploadBook" aria-label="上传归属账本"></select></label>
+            <label>这次留下什么<select id="recordIntent" aria-label="记录用途"><option value="auto">自动判断</option><option value="bill">只留轨迹</option><option value="journal">记生活</option></select></label>
+            <label>轨迹归属<select id="uploadBook" aria-label="上传归属账本"></select></label>
         </div>
-        <p class="privacy-note">账单默认仅入账本，想写成日记时再选择留下。</p>
+        <p class="privacy-note">消费自动留下轨迹，想写成日记时再选择。短句未写币种时，按默认币种记录。</p>
         <label class="check-label"><input id="useAI" type="checkbox" checked><span>让AI整理文字与账单</span></label>
         <p class="privacy-note">开启后，所选文字与压缩图片会交给AI处理；原文件留在此设备。每次最多六张图片。</p>
         <div class="panel-actions">
@@ -162,18 +162,24 @@
         <div id="modalContent"></div>
     </div>
 
-<script defer src="/assets/ledger-core.js?v=20261028d1"></script>
-<script defer src="/assets/quick-bill.js?v=20261028d1"></script>
-<script defer src="/assets/desktop-ui.js?v=20261028d1"></script>
-<script defer src="/assets/storage.js?v=20261028d1"></script>
-<script defer src="/assets/backup-core.js?v=20261028d1"></script>
-<script defer src="/assets/drafts-service.js?v=20261028d1"></script>
-<script defer src="/assets/journal-core.js?v=20261028d1"></script>
-<script defer src="/assets/journal-ui.js?v=20261028d1"></script>
-<script defer src="/assets/backup-ui.js?v=20261028d1"></script>
-<script defer src="/assets/feedback-ui.js?v=20261028d1"></script>
-<script defer src="/assets/mine-ui.js?v=20261028d1"></script>
-<script defer src="/assets/app.js?v=20261028d1"></script>
+<script defer src="/assets/ledger-core.js?v=20261029s1"></script>
+<script defer src="/assets/display-core.js?v=20261029s1"></script>
+<script defer src="/assets/life-core.js?v=20261029s1"></script>
+<script defer src="/assets/navigation.js?v=20261029s1"></script>
+<script defer src="/assets/trajectory-core.js?v=20261029s1"></script>
+<script defer src="/assets/story-core.js?v=20261029s1"></script>
+<script defer src="/assets/trajectory-ui.js?v=20261029s1"></script>
+<script defer src="/assets/quick-bill.js?v=20261029s1"></script>
+<script defer src="/assets/desktop-ui.js?v=20261029s1"></script>
+<script defer src="/assets/storage.js?v=20261029s1"></script>
+<script defer src="/assets/backup-core.js?v=20261029s1"></script>
+<script defer src="/assets/drafts-service.js?v=20261029s1"></script>
+<script defer src="/assets/journal-core.js?v=20261029s1"></script>
+<script defer src="/assets/journal-ui.js?v=20261029s1"></script>
+<script defer src="/assets/backup-ui.js?v=20261029s1"></script>
+<script defer src="/assets/feedback-ui.js?v=20261029s1"></script>
+<script defer src="/assets/mine-ui.js?v=20261029s1"></script>
+<script defer src="/assets/app.js?v=20261029s1"></script>
 <script>
 window.addEventListener('load', function () {
     if (!window.ShijianApp) {
