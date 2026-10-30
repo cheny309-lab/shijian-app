@@ -176,3 +176,26 @@ select,input { font-size:16px; padding:10px 12px; border:1px solid #e1e1d9; bord
 @media(max-width:350px){.story-day{grid-template-columns:8px minmax(0,1fr);column-gap:9px}.story-day .trajectory-edit-name{font-size:15px}.story-day .trajectory-heading{gap:7px}.story-day .trajectory-edit-amount{font-size:12px}}
 
 .backup-text{display:block;width:100%;min-height:160px;max-height:280px;font-size:12px;white-space:pre;overflow:auto;resize:vertical}.trajectory-caption{gap:8px;flex-wrap:wrap}.trajectory-caption h2{margin-right:auto}
+
+/* v0.5.3 紧凑手账：留白随内容结束，触控入口仍可点击。 */
+.story-day{gap:8px 12px;margin:22px 0 30px;min-height:0}
+.story-day>.trajectory-content{padding-bottom:0}
+.story-day>.trajectory-line:after{bottom:0;top:10px}
+.story-day .trajectory-node{padding:0 0 8px;margin:0 0 6px}
+.story-day .trajectory-edit-name,.story-day .trajectory-edit-amount{padding:5px 0;min-height:36px}
+.story-day-title{font-size:17px}.story-day-header{gap:10px}
+.trajectory-context{font-size:12px;color:#858b80;line-height:1.6;margin:0 0 4px}
+.story-day-summary{margin:5px 0 0;padding-top:3px}
+.story-day-summary>summary{min-height:36px}
+.category-tags{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}
+.category-tag{flex:0 1 calc(50% - 4px);border:0;border-radius:18px;background:#f0f2ea;color:#62725d;font:inherit;font-size:13px;min-height:40px;padding:9px 12px;text-align:left}
+.category-tag[aria-expanded=true]{background:#e0e8da}
+.category-breakdown h4{font-size:14px;font-weight:500;margin:10px 0}
+.category-detail-row{display:block;min-height:40px;width:100%;border:0;border-bottom:1px solid #edf0e7;background:none;text-align:left;color:#687462;font:inherit;font-size:13px;padding:8px}
+.month-story{font-size:15px;line-height:1.95;white-space:pre-wrap;color:#596450}
+.month-sources{margin-top:18px}.month-sources .reflection{background:none;padding:8px 0;margin:0;border-bottom:1px solid #e8ebe2;border-radius:0}
+.transfer-link{width:100%;font-size:12px;min-height:90px;overflow-wrap:anywhere}
+
+.transfer-page{max-width:620px;margin:40px auto;padding:24px;color:#596450;line-height:1.8}.transfer-page button{margin:8px 12px 8px 0}
+
+body.transfer-body{display:block;height:auto;min-height:100dvh;overflow:auto}

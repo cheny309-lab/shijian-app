@@ -5,7 +5,8 @@ function readLocal(){return new Promise((resolve,reject)=>{const req=indexedDB.o
 self.onmessage=async event=>{
     const {requestId,action}=event.data;
     try {
-        if(action==='read') {
+        if(action==='verify'){if(event.data.file.size>ShijianBackup.MAX_BYTES)throw Error('备份超过本版支持的范围，请保留原文件。');await ShijianBackup.unpack(JSON.parse(await event.data.file.text()));self.postMessage({requestId,result:{verified:true}});
+        } else if(action==='read') {
             ShijianBackup.preflight(event.data.file.size,event.data.estimate);
             self.postMessage({requestId,progress:'正在核对备份内容…'});
             const raw=JSON.parse(await event.data.file.text()); incoming=await ShijianBackup.unpack(raw);

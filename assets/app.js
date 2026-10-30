@@ -13,6 +13,7 @@
     const Nav=window.ShijianNavigation.create({getPage:()=>S.page,setPage:page=>{S.previousPage=S.page;S.page=page;render();},blocked:()=>!S.ready||$('detailModal').classList.contains('show')||$('inputPanel').classList.contains('show')});
     const currentRecord = key => S.records.find(r => r.id === key);
     const Drafts = window.ShijianDrafts.create({DB,node,button,ready:()=>S.ready,composerValue:()=>({text:$('messageInput').value,images:S.drafts,intent:$('recordIntent').value,bookId:$('uploadBook').value,useAI:$('useAI').checked}),setComposer:draft=>{$('messageInput').value=draft.text||'';S.drafts=draft.images||[];$('recordIntent').value=draft.intent||'auto';S.intentTouched=!!draft.intent&&draft.intent!=='auto';$('uploadBook').value=books().some(b=>b.id===draft.bookId)?draft.bookId:'daily';$('useAI').checked=!!draft.useAI;renderDrafts();}});
+    const Long=window.ShijianLongImage;
     const Files=window.ShijianFileExport.create({node,button,modal,toast});
     const Manual=window.ShijianManualEntry.create({S,C,DB,node,button,modal,closeModal,refresh,toast,report});
     const Journals = window.ShijianJournals.create({ S, C, J, DB, node, button, field, input, modal, closeModal, refresh, report, toast, id, openRecord, showSource, runJournal, scheduleReflections, render, Drafts });
@@ -118,7 +119,7 @@
             image.onload = () => {
                 try {
                     // 竖长账单保留较高分辨率；极长截图请拆分，避免压成无法阅读的小字。
-                    if (image.naturalHeight / image.naturalWidth > 10) throw Error('这张账单较长，请分成几张稍有重叠的截图再上传；本次输入仍保留。');
+                    if(image.naturalWidth*image.naturalHeight>60000000)throw Error('这张图片较大，请分成几张再留下。');
                     const scale = Math.min(1, 1600 / image.naturalWidth, 4096 / image.naturalHeight);
                     const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
                     const ctx = canvas.getContext('2d'); if (!ctx) throw Error('当前浏览器不能处理图片。');
@@ -288,7 +289,7 @@
         const picture = imageOK(source.original) ? source.original : source.preview;
         if (imageOK(picture)) { const img = node('img', 'detail-image source-original'); img.src = picture; img.alt = source.name || '来源图片'; root.append(img); }
         if (source.text) root.append(node('p', 'detail-text', source.text));
-        root.append(node('p', 'muted', source.name || '原始文字'));
+        root.append(node('p', 'muted', source.name || '原始文字'));const job=S.imports.find(i=>i.id===sourceId);if(job?.partial||job?.status==='failed'){root.append(node('p','muted','已留下读到的部分，原始资料仍在。'));for(const warning of job.warnings||[])root.append(node('p','muted',warning));root.append(button('再读一次这份资料',()=>{closeModal();void runBills(sourceId,true);}));}
         const related = S.transactions.filter(t => !t.deleted && t.sourceIds.includes(sourceId));
         related.forEach(t => root.append(button((t.merchant || '交易') + ' · ' + amount(t.amountMinor, t.currency), () => openTransaction(t.id))));
     }
@@ -322,6 +323,22 @@
         }));
     }
 
+    async function extractSource(source,old,token){
+        if(!source.original&&!source.preview)return post('/api/bills/extract',message(source.text));
+        const prep=await Long.parts(source);
+        if(prep.layout.length===1)return post('/api/bills/extract',message(source.text,source.preview));
+        if(prep.width<260)return{transactions:[],totals:[],documentKind:'bill',warnings:['这张长图的文字较小，原图已留下。换一张更清晰的原图，或分几张上传，通常能读得更完整。'],partial:true,segments:[]};
+        const segments=[];let header='',failures=0;
+        for(const tile of prep.layout){
+            const cached=old?.partial&&(old.segments||[]).find(s=>s.index===tile.index&&s.data&&!s.data.truncated);
+            if(cached){segments.push(cached);if(tile.index===0)header=(cached.data.totals||[]).map(t=>t.period).join('；');continue;}
+            const instruction='这是同一张长账单的第'+(tile.index+1)+'/'+prep.layout.length+'段。上下边缘有重叠上下文，只提取金额行中心位于图片高度'+Math.round(tile.top*100)+'%至'+Math.round(tile.bottom*100)+'%范围的交易。范围外只用于读全商户和日期，不重复输出。缺失年月不能按上传时间补。月合计不是交易。'+(header?'首段可确认的期间原文（仅作为上下文，不能凭此补缺失的年份）：'+header:'');
+            let result;try{result=await post('/api/bills/extract',message([source.text,instruction].filter(Boolean).join('\n'),Long.crop(prep.image,tile)));if(!Array.isArray(result.transactions)||!Array.isArray(result.totals))throw Error('这一段返回不完整');segments.push({index:tile.index,data:result});failures=0;if(tile.index===0)header=result.totals.map(t=>t.period).join('；');}catch(error){segments.push({index:tile.index,error:error.message});failures++;if(['AI_AUTH','AI_KEY_MISSING','AI_CONFIGURATION','AI_LIMIT'].includes(error.code)||failures>=3){for(const rest of prep.layout.filter(p=>p.index>tile.index))segments.push({index:rest.index,error:'这段尚未整理，原图仍在。'});}}
+            await DB.changeLedger(state=>{const latest=state.imports.find(i=>i.id===source.id);return latest?.token===token?{imports:[{...latest,segments:[...segments],progress:segments.length+'/'+prep.layout.length,partial:true,startedAt:new Date().toISOString()}]}:{};});
+            if(segments.length===prep.layout.length)break;
+        }
+        return{...Long.combine(segments),segments};
+    }
     // 账单流水线：候选、校验、去重与入账为独立阶段，失败留在来源任务中。
     async function runBills(sourceId, retry = false) {
         if (runningBills.has(sourceId)) return;
@@ -340,10 +357,10 @@
                 if (!claim.claimed) { const latest = await DB.get('imports', sourceId); if (latest && latest.status === 'done') await routeSource(sourceId, latest.documentKind || (latest.extractedCount ? 'bill' : 'uncertain')); toast('这份来源已经在整理或已完成，不会重复提交。'); return; }
                 await refresh();
                 try {
-                    const data = await post('/api/bills/extract', message(source.text, source.preview));
+                    const data = await extractSource(source,old,token);
                     if (!Array.isArray(data.transactions) || !Array.isArray(data.totals)) throw Error('账单返回格式不完整，尚未入账。');
                     const candidates = data.transactions.map((raw, index) => {
-                        const candidate = T.normalize(raw, sourceId, index,{documentKind:C.documentKind(data),aiAllowed:source.aiAllowed,feeling:source.text});
+                        const candidate = T.normalize(raw, sourceId, raw._segment===undefined?index:raw._segment*100+raw._row,{documentKind:C.documentKind(data),aiAllowed:source.aiAllowed,feeling:source.text});
                         candidate.bookId = source.bookId || 'daily';
                         // 显式重新识别保留已有交易；新候选重新走去重与核对，不能覆盖用户的修改。
                         if (claim.reprocess) candidate.id = sourceId + ':attempt:' + token + ':row:' + index;
@@ -351,8 +368,8 @@
                     });
                     const warnings = [...(Array.isArray(data.warnings) ? data.warnings : []), ...C.checkTotals(candidates, data.totals)];
                     if (C.documentKind(data) === 'bill' && !candidates.length && !data.totals.length) warnings.push('已识别为账单资料，但没有提取出明细；原图仍在，可以重新识别或补充清晰截图。');
-                    if (data.truncated) {
-                        warnings.push('这份资料超过单张处理范围，候选暂不入账，请分段上传并核对。');
+                    if (data.truncated || data.partial) {
+                        warnings.push('已留下读到的片段，部分内容尚未读清。原图仍在，需要时可以重试。');
                         candidates.forEach(t => { t.status = 'review'; t.confirmation = ''; t.reasons.push('来源未完整识别'); });
                     }
                     await DB.changeLedger(state => {
@@ -367,7 +384,7 @@
                         }
                         const merged = T.ingest(state.transactions, candidates);
                         const attempts = [...(latest.attempts || []), { at: new Date().toISOString(), token, extractedCount: candidates.length, linked: merged.linked }];
-                        return { transactions: merged.transactions, imports: [{ id: sourceId, status: 'done', documentKind: C.documentKind(data), finishedAt: new Date().toISOString(), totals: data.totals, warnings, extractedCount: candidates.length, linked: merged.linked, attempts }] };
+                        return { transactions: merged.transactions, imports: [{ id: sourceId, status: 'done', documentKind: C.documentKind(data), finishedAt: new Date().toISOString(), totals: data.totals, warnings, extractedCount: candidates.length, linked: merged.linked, attempts,partial:!!data.partial,segments:data.segments||[] }] };
                     });
                     await routeSource(sourceId, C.documentKind(data));
                     if(candidates.length)toast('已留在轨迹，随时回看。');else if(data.totals.length)toast('这份记录已留下。');
@@ -423,7 +440,7 @@
         try {
             await refresh();requestEpoch=(await DB.get('meta','importEpoch'))?.value||'';
             const existing = manualIds ? S.reflections.filter(r => !manualIds.includes(r.id)) : S.reflections;
-            jobs = T.reflectionJobs(S.transactions, S.records.filter(r => r.aiAllowed === true && C.onTimeline(r)), existing, C.dayKey(), manualIds ? Number.MAX_SAFE_INTEGER : 6);
+            jobs = T.reflectionJobs(S.transactions, S.records.filter(r => r.aiAllowed === true && C.onTimeline(r)), existing, C.dayKey(), manualIds ? Number.MAX_SAFE_INTEGER : 6,!!manualIds);
             if (manualIds) jobs = jobs.filter(j => manualIds.includes(j.id)).slice(0, 6);
             while (jobs.length > 1 && JSON.stringify(jobs).length > 20000) jobs.pop();
             if (!jobs.length) return;
@@ -445,10 +462,10 @@
     }
     function renderReflections(root) {
         const entries = S.reflections.filter(r => r.id.startsWith(S.month)).sort((a, b) => a.id.length - b.id.length || b.id.localeCompare(a.id));
-        if (!entries.length) return;
-        const section = node('section', 'bill-section'); section.append(node('h3', '', '这一月的片段'));
+        const holder=node('div');root.append(holder);
+        const section = node('section', 'bill-section'); section.append(node('h3', '', '这一月，回头看看'));const month=entries.find(r=>r.id===S.month),pending=T.reflectionJobs(S.transactions,S.records.filter(r=>r.aiAllowed===true&&C.onTimeline(r)),S.reflections,C.dayKey(),Number.MAX_SAFE_INTEGER,true).some(j=>j.id===S.month);section.append(node('p','muted','依据已留下且允许整理的片段生成，保留你的改写。'));if(!month||pending)section.append(node('p','muted',month?'有了新的片段，可以重新整理这一月。':'把已经留下的日常，轻轻串成一段回望。'));const generate=button(month?'整理新的片段':'整理这一月',async()=>{generate.disabled=true;await runReflections([S.month]);if(holder.isConnected){holder.replaceChildren();renderReflections(holder);}});section.append(generate);const sources=node('details','month-sources');sources.append(node('summary','','查看这些片段的来源'));if(entries.some(r=>r.id!==S.month))section.append(sources);
         entries.forEach(r => {
-            const box = node('details', 'reflection'); box.append(node('summary', '', r.id.length === 7 ? '这一月，慢慢回看' : r.id.slice(5).replace('-', '月') + '日'));
+            const monthly=r.id.length===7,box = node(monthly?'div':'details',monthly?'month-story':'reflection');if(!monthly)box.append(node('summary','',r.id.slice(5).replace('-', '月') + '日'));
             const hasData = S.transactions.some(t => !t.deleted && T.ready(t) && T.period(t).startsWith(r.id)) || S.records.some(note => note.aiAllowed === true && C.onTimeline(note) && J.day(note).startsWith(r.id));
             if (!hasData) box.append(node('p', 'muted', '对应的数据已移除或修正，这里保留原来的回看文字。'));
             if (r.text) box.append(node('p', 'detail-text', r.text));
@@ -458,8 +475,8 @@
                 const card = modal('属于你的回看'); const text = node('textarea', 'journal-editor'); text.value = r.text || ''; text.maxLength = 8000; text.setAttribute('aria-label', '编辑生活回看'); card.append(text);
                 card.append(button('保存', async () => { try { const latest = await DB.get('reflections', r.id); await DB.put('reflections', { ...latest, text: text.value, edited: true, editHistory: [...(latest.editHistory || []), { at: new Date().toISOString(), before: latest.text || '', after: text.value }] }); await refresh(); closeModal(); } catch (error) { report(error); } }, 'primary-button'));
                 if (r.candidate) { card.append(node('p', 'detail-label', 'AI的新候选 · 可复制或采用'), node('p', 'detail-text', r.candidate)); card.append(button('采用候选', () => { text.value = r.candidate; })); }
-            })); section.append(box);
-        }); root.append(section);
+            })); (monthly?section:sources).append(box);
+        }); holder.append(section);
     }
 
     // 私密与备份的最小入口；完整“我的”与导入恢复留给下一模块。

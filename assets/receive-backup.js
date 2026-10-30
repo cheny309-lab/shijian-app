@@ -1,0 +1,11 @@
+(function(){'use strict';const status=document.getElementById('status'),receive=document.getElementById('receive'),result=document.getElementById('result'),parts=location.hash.slice(1).split('.');history.replaceState(null,'',location.pathname);let blob,name;
+ const button=(text,fn)=>{const b=document.createElement('button');b.className='quiet-button';b.textContent=text;b.onclick=fn;result.append(b);};
+ if(parts.length!==3||!/^[-\w]{32}$/.test(parts[0])){status.textContent='接收链接不完整，请从原设备重新复制。';receive.disabled=true;return;}
+ receive.onclick=async()=>{receive.disabled=true;status.textContent='正在接收并核验…';let worker,timer;try{const r=await fetch('/api/backup-relay/'+parts[0]);if(!r.ok)throw Error('这次传送已到期或已撤回，请在原设备重新发起。');const out=await ShijianTransfer.open(await r.arrayBuffer(),parts[1],parts[2]);blob=out.blob;name=out.name;
+ await new Promise((resolve,reject)=>{worker=new Worker('/assets/backup-worker.js');worker.onmessage=({data})=>{if(data.progress)return;data.error?reject(Error(data.error.message)):resolve();};timer=setTimeout(()=>reject(Error('核验时间较长，请保留原记录并重试。')),180000);worker.onerror=()=>reject(Error('未能核验，请保留原记录并重试。'));worker.postMessage({action:'verify',requestId:1,file:blob});});worker.terminate();
+ status.textContent='文件已接收并通过完整性核验。请再选择保存位置；此时尚未保存文件。';await fetch('/api/backup-relay/'+parts[0]+'/received',{method:'POST'}).catch(()=>{});
+ const p=document.createElement('p');p.textContent=name+' · '+(blob.size/1024).toFixed(1)+' KB';result.append(p);
+ if(typeof showSaveFilePicker==='function')button('选择位置并保存',async()=>{try{const h=await showSaveFilePicker({suggestedName:name}),w=await h.createWritable();await w.write(blob);await w.close();status.textContent='文件已写入你选择的位置。可以回到拾间，通过“我的 → 导入恢复”查看内容后再决定导入。';}catch(e){status.textContent=e.name==='AbortError'?'这次没有选择位置，接收文件仍在此页。':'这次保存未完成，可以尝试下载文件。';}});
+ button('下载备份文件',()=>{const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);status.textContent='已发起下载，请在此浏览器的下载列表找到 '+name+'。';});
+ }catch(e){status.textContent=e.message||'未能解密这份备份，请重新复制完整链接。';receive.disabled=false;}finally{clearTimeout(timer);worker?.terminate();}};
+})();

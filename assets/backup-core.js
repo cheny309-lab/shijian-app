@@ -82,7 +82,7 @@
             if(t.status==='confirmed' && (!C.date(t.occurredAt)||!(t.currency in C.DIGITS)||t.amountMinor===null||!['income','expense','refund','transfer'].includes(t.direction))) fail('BACKUP_MONEY','有些已确认账单需要先核对金额或日期。');
             if(t.refundOf && !sets.transactions.has(t.refundOf)) fail('BACKUP_REFUND','有一笔退款缺少关联消费，本次未写入。');
         }
-        for(const d of data.drafts) if(!['composer','editor','feedback'].includes(d.kind)) fail('BACKUP_DRAFT','有一份草稿暂时无法读取。');
+        for(const d of data.drafts) if(!['composer','editor','feedback','manual'].includes(d.kind)) fail('BACKUP_DRAFT','有一份草稿暂时无法读取。');
         return data;
     }
     async function unpack(raw) {
