@@ -15,11 +15,11 @@
     async function exportBackup(){if(busy){toast('上一份备份还在整理，请稍等。');return;}busy=true;let client;try{
         client=workerClient();const result=await client.call('pack',{version:C.VERSION});
         const date=new Date(),stamp=C.dayKey().replaceAll('-','')+'_'+[date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join('');
-        download(result.blob,'shijian_backup_'+stamp+'.json');await DB.put('meta',{key:'lastExport',value:new Date().toISOString()});await refresh();toast('已生成完整备份并交给浏览器下载。文件未加密，请妥善保存。');
+        await DB.put('meta',{key:'lastBackupPrepared',value:new Date().toISOString()});await refresh();d.Files.present(result.blob,'shijian_backup_'+stamp+'.json',{backup:true,onConfirmed:async()=>{await DB.put('meta',{key:'lastBackupConfirmed',value:new Date().toISOString()});await refresh();}});
     }catch(e){report(e);}finally{client?.stop();busy=false;}}
     function openImport(){
-        const root=modal('把生活带回来');root.append(node('p','muted','选择拾间的完整备份。先核对，再由你决定；预览不会改动现有记录，也不会发送给AI。'));
-        const file=node('input');file.type='file';file.accept='.json,application/json';file.setAttribute('aria-label','选择完整备份');root.append(file);
+        const root=modal('把生活带回来');root.append(node('p','muted','选择拾间的完整备份（JSON或备份文本TXT）。先核对，再由你决定；预览不会改动现有记录，也不会发送给AI。'));
+        const file=node('input');file.type='file';file.accept='.json,.txt,application/json,text/plain';file.setAttribute('aria-label','选择完整备份');root.append(file);
         const status=node('p','muted');status.setAttribute('role','status');root.append(status);let client,plan,choices={},incomingFile,commitButton,finished=false,committing=false,generation=0;
         const pref=node('input');pref.type='checkbox';pref.setAttribute('aria-label','恢复昵称与金额显示偏好');const prefLabel=node('label','check-label');prefLabel.append(pref,node('span','','同时恢复昵称与金额显示偏好（不会自动开启AI）'));root.append(prefLabel);pref.addEventListener('change',()=>{if(commitButton)commitButton.disabled=true;status.textContent='选择已改变，请先重新预览。';});
         const detail=node('div');root.append(detail);

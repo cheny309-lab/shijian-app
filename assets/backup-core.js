@@ -6,7 +6,7 @@
     'use strict';
     const TABLES = ['records','sources','transactions','imports','reflections','meta','drafts','feedbackRecords','conflicts'];
     const MAX_BYTES = 50 * 1024 * 1024;
-    const internalKeys = new Set(['dataRevision','importEpoch','importPauseAI','importTask','lastExport','backupExtensions','datasetId','legacy-migrated']);
+    const internalKeys = new Set(['dataRevision','importEpoch','importPauseAI','importTask','lastExport','lastBackupPrepared','lastBackupConfirmed','backupExtensions','datasetId','legacy-migrated']);
     const badKeys = new Set(['__proto__','prototype','constructor']);
     const img = s => typeof s === 'string' && /^data:image\/(?:png|jpe?g|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(s);
     const stable = value => value === undefined ? 'null' : value === null || typeof value !== 'object' ? JSON.stringify(value) : Array.isArray(value) ? '[' + value.map(stable).join(',') + ']' : '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + stable(value[k])).join(',') + '}';

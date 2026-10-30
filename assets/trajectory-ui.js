@@ -36,8 +36,8 @@
  }
  function render(){const root=document.getElementById('billsPage');root.replaceChildren();const all=rows(),gs=T.groups(all),summary=T.summary(all,S.month);
   const intro=node('div','trajectory-intro'),months=node('select');months.setAttribute('aria-label','账单月份');for(const m of [...new Set([C.dayKey().slice(0,7),S.month,...gs.map(g=>g.period.slice(0,7)).filter(T.validMonth),...sourceRows().map(s=>(s.trajectoryDate||'').slice(0,7)).filter(T.validMonth)])].sort().reverse()){const o=node('option','',`${m.slice(0,4)}年${+m.slice(5)}月`);o.value=m;months.append(o);}months.value=S.month;months.addEventListener('change',()=>{S.month=months.value;render();});intro.append(months,button(S.hideAmounts?'显示金额':'隐藏金额',async()=>{try{await DB.put('meta',{key:'hideAmounts',value:!S.hideAmounts});await refresh();}catch(e){report(e);}}));root.append(intro);
-  const head=node('div','trajectory-caption');head.append(node('h2','','生活轨迹'),button('更多',more));root.append(head);
-  const overview=node('section','trajectory-overview story-overview');overview.dataset.testid='overview';overview.append(node('p','muted','这些天留下的日常'),button('本月回顾',review,'trajectory-related'));root.append(overview);
+  const head=node('div','trajectory-caption');head.append(node('h2','','生活轨迹'),button('手动记一笔',()=>{void d.Manual.open().catch(report);},'trajectory-related'),button('更多',more));root.append(head);
+  const overview=node('section','trajectory-overview story-overview');overview.dataset.testid='overview';overview.append(node('p','muted','这里记账，也回看生活。'),button('本月回顾',review,'trajectory-related'));root.append(overview);
   const dated=new Map(),dateGroups=new Map();for(const g of gs.filter(g=>g.period.startsWith(S.month))){if(!dateGroups.has(g.period))dateGroups.set(g.period,[]);dateGroups.get(g.period).push(g);}
   for(const [day,dayGroups]of dateGroups)dated.set(day,Story.order(dayGroups).map(nodeCard));
   for(const s of sourceRows().filter(s=>(s.trajectoryDate||'').startsWith(S.month))){const k=s.trajectoryDate;if(!dated.has(k))dated.set(k,[]);dated.get(k).push(sourceCard(s));}

@@ -174,3 +174,5 @@ select,input { font-size:16px; padding:10px 12px; border:1px solid #e1e1d9; bord
 .story-day-summary .muted{font-size:12px;margin:5px 0}.story-summary-note{font-size:11px;line-height:1.7;color:#7a8273;margin:8px 0}
 .story-overview{padding:0 0 14px!important;margin-bottom:0!important;border:0!important}.story-overview>.muted{margin:0 0 3px}
 @media(max-width:350px){.story-day{grid-template-columns:8px minmax(0,1fr);column-gap:9px}.story-day .trajectory-edit-name{font-size:15px}.story-day .trajectory-heading{gap:7px}.story-day .trajectory-edit-amount{font-size:12px}}
+
+.backup-text{display:block;width:100%;min-height:160px;max-height:280px;font-size:12px;white-space:pre;overflow:auto;resize:vertical}.trajectory-caption{gap:8px;flex-wrap:wrap}.trajectory-caption h2{margin-right:auto}
